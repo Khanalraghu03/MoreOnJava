@@ -1,0 +1,43 @@
+function isNoLogoTitleEx() {
+	var s = ["1260064549"];
+	var i = getURLParameter("isbn");
+	nl = s.indexOf(i) >= 0 || getURLParameter("LSTRE-1583") == "1";
+	return nl;
+}
+
+function isMBC() {
+	var products = ["151650"];
+
+	return isIntegration(products, "mbc");
+}
+
+function isIAAP() {
+	var products = ["148215", "151355"];
+
+	return isIntegration(products, "iaap");
+}
+
+function isTTS() {
+	var products = ["148655", "148636", "148633", "152480"];
+
+	return isIntegration(products, "tts");
+}
+
+function isIntegration(products, customerName) {
+	// Current info
+	var currentExtProductId = getURLParameter("externalProductId");
+	var currentProductId = getURLParameter("product");
+	var currentCustomer = getURLParameter("customer");
+
+	function checkExtProductId(productId) {
+		return currentExtProductId.indexOf(productId) >= 0
+	}
+
+	function checkProductId(productId) {
+		return currentProductId.indexOf(productId) >= 0
+	}
+
+	return (currentExtProductId != null && products.some(checkExtProductId))
+		|| (currentProductId != null && products.some(checkProductId))
+		|| (currentCustomer != null && currentCustomer.indexOf(customerName) >= 0);
+}

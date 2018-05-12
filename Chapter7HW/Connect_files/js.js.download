@@ -1,0 +1,95 @@
+function includeScript(url, callback) {
+	var head = document.getElementsByTagName('head')[0];
+	var script = document.createElement('script');
+	script.type = 'text/javascript';
+	script.src = url;
+	
+	script.onreadystatechange = callback(url);
+	script.onload = callback(url);
+	
+	head.appendChild(script);
+}
+
+function includeCSS(url, callback) {
+	var head = document.getElementsByTagName('head')[0];
+	var style = document.createElement('link');
+	style.type = 'text/css';
+	style.rel = 'stylesheet'
+	style.href = url;
+    	
+	style.onreadystatechange = callback(url);
+	style.onload = callback(url);
+	
+	head.appendChild(style);
+}
+
+(function() {
+	var callback = function(filename) {
+		console.log(filename + " loaded");
+	};
+
+} ());
+
+function loadJSFile(url) {
+	var head = document.getElementsByTagName('head')[0];
+	var node = document.createElement('script');
+	node.setAttribute("type","text/javascript");
+	node.setAttribute("src", url);
+	head.appendChild(node);
+}
+
+function promiseJSFile(url) {
+  var promise = new Promise(function(resolve, reject) {
+
+    var script = document.createElement('script');
+    script.src = url;
+
+    script.addEventListener('load', function() {
+      resolve(script);
+    }, false);
+
+    script.addEventListener('error', function() {
+      reject(script);
+    }, false);
+
+    document.body.appendChild(script);
+  });
+
+  return promise;
+}
+
+function loadCSSFile(url) {
+	var head = document.getElementsByTagName('head')[0];
+	var node = document.createElement("link");
+	node.setAttribute("rel", "stylesheet");
+	node.setAttribute("type", "text/css");
+	node.setAttribute("href", url);
+	head.appendChild(node);
+}
+
+function fixScheme(url) {
+	var currentScheme = window.location.href.split("://")[0];
+	if (currentScheme == "https")
+		return url.replace("http://", "https://");
+	return url;
+}
+
+// WARNING: if sanboxed product user does need all the scripts and css files on local machine
+var sbScriptLocation = (function() {
+	var loc = "";
+    var scripts = document.getElementsByTagName('script');
+    if (scripts.length > 0){
+    	var script = scripts[scripts.length - 1];
+    	loc = script.src.substr(0, script.src.lastIndexOf('/') + 1);
+    }
+    return loc;
+})();
+
+var sbCSSLocation = (function() {
+    var loc = sbScriptLocation.replace("/js/", "/css/");
+    return loc;
+})();
+
+loadCSSFile(fixScheme(sbCSSLocation + "jquery.qtip.css"));
+loadJSFile(fixScheme(sbScriptLocation + "jquery.qtip.min.js"));
+loadJSFile(fixScheme(sbScriptLocation + "jquery.iviewer.js"));

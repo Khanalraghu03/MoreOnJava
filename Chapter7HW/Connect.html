@@ -1,0 +1,226 @@
+
+<!-- saved from url=(0052)https://newconnect.mheducation.com/flow/connect.html -->
+<html manifest="/flow/connect/html/container.appcache" xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" class="gr__newconnect_mheducation_com"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8"> 
+	
+	<meta http-equiv="X-UA-Compatible" content="IE=edge">
+	
+
+	<!-- disable user scaling on mobile devices -->
+	<meta name="viewport" content="initial-scale=1.0, user-scalable=yes, width=device-width">
+	<meta name="apple-mobile-web-app-capable" content="yes">
+
+	<script type="text/javascript" src="./Connect_files/dtagent_ICAr_7000000201016.js.download" data-dtconfig="agentUri=/connect/dtagent_ICAr_7000000201016.js|rid=RID_-1553805632|rpid=-1806155366|domain=mheducation.com|lastModification=1522438952830|tp=500,50,0,1|lab=1|reportUrl=dynaTraceMonitor|app=Default Application"></script><link rel="shortcut icon" type="image/ico" href="https://newconnect.mheducation.com/flow/icons/container.ico">
+
+	<title>Connect</title>
+	
+	<style type="text/css">
+		.mobile_button {
+			-moz-border-radius:6px;
+			-webkit-border-radius:6px;
+			border-radius:6px;
+			display:inline-block;
+			cursor:pointer;
+			color:#ffffff;
+			font-family:arial;
+			font-size:14px;
+			font-weight:bold;
+			padding: 20px 42px;
+			text-decoration:none;
+			text-shadow:0px 0px 0px #9b14b3;
+		}
+		.mobile_button:active {
+			position:relative;
+			top:1px;
+		}
+		.mobile_link_wrapper {
+			margin-top: 20px;
+			font-size: 18px;
+		}
+		.mobile_link {
+			color: #3988D7;
+			text-decoration-color: #BDDAEA;
+			font-weight: bold;
+			cursor: auto;
+		}
+		.clearfix:before,
+		.clearfix:after {
+			display: table;
+			content: " ";
+		}
+		#mobile_app_link {
+			background-color: #2b80d5;
+			font-size: 20px;
+			margin-bottom: 35px;
+		}
+		#mobile_menu {
+			font-family: proxima-nova, sans-serif; 
+			font-style: normal; 
+			display: none;
+		}
+		.clearfix:after{
+			clear: both;
+		}
+	</style>
+	
+	
+	<script type="text/javascript" src="./Connect_files/helper.js.download"></script>
+	<script type="text/javascript" src="./Connect_files/Promise.min.js.download"></script>
+	<script type="text/javascript">
+		var url = window.location.protocol + "//" + window.location.host + window.location.pathname;
+		
+		var urlParams = null;
+		if (window.location.search != "") {
+			if (window.location.search.indexOf("env=") < 0)
+				urlParams = window.location.search + "&env=" + defineEnv() + window.location.hash;
+			else
+				urlParams = window.location.search + window.location.hash;
+		} else {
+			urlParams = "?env=" + defineEnv() + window.location.hash;
+		}
+
+		var iOSAppURL = "container://" + urlParams;
+		var iOSStoreURL = "https://itunes.apple.com/us/app/mhe-connect/id986837573?ls=1&mt=8";
+		var androidAppURL = "intent://" + urlParams + "#Intent;scheme=container;package=dk.area9.containerereader;end";
+		var androidStoreURL = "https://play.google.com/store/apps/details?id=dk.area9.containerereader";
+		
+		var userOS = getOS(); // will either be iOS, Android or unknown
+		var appURL = null;
+		var storeURL = null;
+		var backUrl = null;
+		var useUserChoice = true;
+		
+		if ( userOS == 'iOS' ) {
+			appURL = iOSAppURL;
+			storeURL = iOSStoreURL;
+		} else if ( userOS == 'Android' ) {
+			appURL = androidAppURL;
+			storeURL = androidStoreURL;
+		}
+
+		window.useRenderer = "auto"; // enable WebGL renderer by default
+		window.dfonts_override = true; // don't use all builtin dfonts
+		window.dfontnames = "ProximaSemiBold\nBook"; // the only dfonts which are loaded and used
+
+
+		if(getURLParameter("launch_presentation_return_url") != "")
+		{
+			backUrl = getURLParameter("launch_presentation_return_url");
+		}
+
+		function userLaunchBrowser() {
+			setCookie("launchBrowser", "true", 1/24);
+
+			launchBrowser();
+		}
+
+		function launchBrowser() {
+			document.getElementById('flow').style.display = 'block';
+			document.getElementById('mobile_menu').style.display = 'none';
+
+			xmlhttp = new XMLHttpRequest();
+			xmlhttp.onreadystatechange = function() {
+				if (xmlhttp.readyState == 4) { // status 200 only when online. 0 when offline
+					loadCSSFile("flowjspixi.css");
+					  promiseJSFile('js/pixi.min.js?r=bts-1').then(function(){
+						var fontUrl = getURLParameter("dfont") == "0" ? 'https://use.typekit.com/hfz6ufz.js' : 'dfontjs/pixi-dfont.js?r=bts-1';
+						promiseJSFile(fontUrl).then(function(){ loadJSFile("container.js?r=bts-1"); });
+					  });
+				}
+			}
+			xmlhttp.open("GET","php/stamp.php?file=container.js", true);
+			xmlhttp.send();
+		}
+		
+		function onLoad() {		//means crossorigin launch inside iframe					
+			try { document.domain = "mheducation.com"; } catch(e) { console.log("Cannot set domain to mheducation.com for connect.html") }
+			try {
+				useUserChoice = window.parent.document.location.pathname.indexOf("ctrlti_provider.php") < 0;
+			} catch (e) {}
+
+			if ( useUserChoice && getURLParameter("ignoreChoice") == "1" ) {
+				setCookie("launchBrowser", "false", 1/24);
+			}
+			
+			var isMobile = (userOS == 'iOS' || userOS == 'Android');
+			var launchNative = (getURLParameter("launchBrowser") != null || shouldLaunchNativeContainer(userOS, urlParams, "launch_native", useUserChoice));
+			var autoLaunch = getURLParameter("noAutoLaunch") == null;
+			
+			if ( isMobile && launchNative )  {
+				var divFlow = document.getElementById('flow');
+				var div = document.getElementById('mobile_menu');
+				var divBack = document.getElementById('back_menu');
+				var storeLink = document.getElementById('mobile_store_link');
+				var appLink = document.getElementById('mobile_app_link');
+				var backLink = document.getElementById('mobile_back_link');
+				
+				divFlow.style.display = 'none';
+				div.style.display = 'block';
+				storeLink.href = storeURL;
+				backLink.href = backUrl;
+
+				if (typeof(backURL) == "undefined" || backUrl == null || backUrl == "") {
+					divBack.style.display = "none";
+				}
+
+				if (userOS == 'Android') {
+					appLink.href = appURL;
+				} else if (userOS == 'iOS') {
+					var ver = getOSVersion();
+					if ( ver[0] >= 9 ) { 
+						appLink.href = getiOSUL() + urlParams;
+					} else {
+						appLink.href = "javascript: launchNativeiOSScheme();";
+						if (autoLaunch) launchNativeiOSScheme();
+					}
+				}
+			} else {
+				if (autoLaunch) launchBrowser();
+			}
+		}
+</script>
+<link rel="stylesheet" type="text/css" href="./Connect_files/flowjspixi.css"><script type="text/javascript" src="./Connect_files/container.js.download"></script><link rel="stylesheet" type="text/css" href="./Connect_files/container.css"></head>
+<body id="disable_menu" onload="onLoad()" data-gr-c-s-loaded="true" style="background-image: none;">
+	<div id="myAlternativeContent">
+		<!--<a href="http://www.adobe.com/go/getflashplayer">
+			<img src="http://www.adobe.com/images/shared/download_buttons/get_flash_player.gif" alt="Get Adobe Flash player" />
+		</a>-->
+	</div>
+	<div id="mobile_menu" style="display: none;">
+		<div style="border-bottom: 1px solid #747B7F;">
+			<div style="display:inline-block; margin: 5px 0px 15px 50px;">
+				<img src="./Connect_files/logo_full.png" style="height: 50px;">
+			</div>
+			<div id="back_menu" style="float:right; margin: 22px 50px 0px 0px;">
+				<a id="mobile_back_link" class="mobile_link" href="https://newconnect.mheducation.com/flow/connect.html#">Go Back</a>
+			</div>
+		</div>
+		<div style="width: 100%; background: radial-gradient(at 25% -10%, #C1DFEF, #FFFFFF, #FFFFFF);">
+			&nbsp;
+			<div class="clearfix" style="width: 760px; margin: 100px auto 0px auto;">
+				<div>
+					<img src="./Connect_files/ipad_image.png" style="margin-top: -42px; width: 350px; float: left;">
+					<div style="float: left; margin-left: 40px; margin-top: 30px;">
+						<div style="color: #595959; margin-bottom: 22px; font-size: 30px; font-weight: bolder;">
+							Tap into Connect's<br>
+							adaptive learning tools,<br>
+							wherever you go!
+						</div>
+						<a href="https://newconnect.mheducation.com/flow/connect.html#" id="mobile_app_link" class="mobile_button">
+							Launch Connect
+						</a>
+						<div class="mobile_link_wrapper">
+							Need the app? Get it <a id="mobile_store_link" class="mobile_link" href="https://newconnect.mheducation.com/flow/connect.html#">here</a>.
+						</div>
+						<div class="mobile_link_wrapper">
+							No thanks, I'll continue on the <a class="mobile_link" href="javascript: userLaunchBrowser();">browser</a>.
+						</div>
+					</div>
+				</div>
+			</div>
+		</div>
+	</div>
+	<div id="flow" style="width: 100%; height: 100%; overflow: hidden; display: block;"></div>
+	<div id="haxe:trace"></div>
+
+
+<script src="./Connect_files/pixi.min.js.download"></script><script src="./Connect_files/pixi-dfont.js.download"></script><canvas width="3000" height="1642" style="width: 1500px; height: 821px;"></canvas><div class="accessElement" style="left: 0px; top: 0px; width: 0px; height: 0px; display: block;"></div><div role="iframe" style="position: fixed; left: 0px; top: 0px; width: 1500px; height: 821px; opacity: 1; display: block;"><iframe src="./Connect_files/lti_consumer.html" allowfullscreen="" frameborder="no" allow="microphone *; camera *" tabindex="0" style="width: 1500px; height: 821px;"></iframe></div></body></html>

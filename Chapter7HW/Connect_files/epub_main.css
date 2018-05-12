@@ -1,0 +1,377 @@
+/*--------------------------------------------------------------------
+// Epub-specific
+//
+// When an EPUB build is created, a link to epub_main.css is added to
+// each card. This can be useful for creating CSS that only appears
+// in the EPUB builds.
+//------------------------------------------------------------------*/
+@import url("../fonts/fonts.css");
+/* Set the base font sizes for small and larger screens */
+html {
+  font-size: 100%;
+      margin: 35px 10px 10px 20px;
+}
+
+a.block-link {
+  color: inherit;
+}
+
+/* pagemark/watermark */
+.pagemark {
+  margin-top: 2.5em;
+  padding: .5em 1em .4em;
+  text-align: center;
+  background: #358eb7;
+  color: #fff;
+  border: 2px solid #2c7cbd;
+}
+
+.pagemark span {
+  font-weight: bold;
+}
+
+.pagemark a {
+  color: #fff;
+  border-bottom: 1px solid #fff;
+  background: none;
+  padding-right: 0;
+  margin-right: 0;
+}
+
+/* base font for generic elements */
+.unsupported-note, .pagemark,
+.blueprint-figure,
+.blueprint-slideshow,
+.blueprint-video,
+.blueprint-other {
+  font-family: "Source Sans Pro", "Verdana", Helvetica, sans;
+  font-size: 1em;
+  line-height: inherit;
+  text-transform: none;
+  letter-spacing: inherit;
+  font-weight: 400;
+}
+
+/* glossary */
+body.glossary dfn {
+  font-size: 1.1em;
+}
+
+body.glossary dd {
+  margin-bottom: 1em;
+}
+
+/* blueprints */
+aside.unsupported-note {
+  width: 90%;
+}
+
+.unsupported-note {
+  display: inline-block;
+  background: url("../img/band.png");
+  background-size: 100% auto;
+  border: 2px solid #e5e5e5;
+  padding: .5em 1em .4em;
+  color: #fff;
+}
+
+.unsupported-note a {
+  color: #fff;
+  border-bottom: 1px solid #fff;
+  background: none;
+  padding-right: 0;
+  margin-right: 0;
+  font-weight: bold;
+}
+
+/* slideshow/multifigure */
+.blueprint-slideshow div.imagefigure {
+  margin-top: 0;
+}
+
+ol.figures li {
+  margin-bottom: 2em;
+  padding-bottom: 1em;
+  border-bottom: 1px solid #e5e5e5;
+}
+
+div.caption {
+  margin: 1em 0 .5em;
+}
+
+div.cite, div.annotations {
+  font-size: .9em;
+  color: #888;
+}
+
+/*------------------------------------------------------------------
+ * Pagination
+ *----------------------------------------------------------------*/
+aside, blockquote, figure, header, iframe,
+nav, object, pre, section, table {
+  page-break-inside: avoid;
+}
+
+/*------------------------------------------------------------------
+ * Unit, Part, Chapter Banner Section 
+ *----------------------------------------------------------------*/
+div.unit-info {
+  margin-left: -25px !important;
+  margin-right: -25px !important;
+  margin-top: -25px !important;
+  padding-top: 10px;
+  padding-bottom: 35px;
+  padding-left: 7.125px !important;
+  padding-right: 7.125px !important;
+}
+@media (min-width: 560px) {
+  div.unit-info {
+    padding-left: 14.25px !important;
+    padding-right: 14.25px !important;
+  }
+}
+@media (min-width: 820px) {
+  div.unit-info {
+    padding-left: 14.25px !important;
+    padding-right: 36.25px !important;
+  }
+}
+
+div.part-info {
+  margin-left: -25px !important;
+  margin-right: -25px !important;
+  margin-top: -25px !important;
+  padding-top: 10px;
+  padding-bottom: 35px;
+  padding-left: 7.125px !important;
+  padding-right: 7.125px !important;
+}
+@media (min-width: 560px) {
+  div.part-info {
+    padding-left: 14.25px !important;
+    padding-right: 14.25px !important;
+  }
+}
+@media (min-width: 820px) {
+  div.part-info {
+    padding-left: 14.25px !important;
+    padding-right: 36.25px !important;
+  }
+}
+
+div.section-info {
+  margin-left: -25px !important;
+  margin-right: -25px !important;
+  margin-top: -25px !important;
+  padding-top: 10px;
+  padding-bottom: 35px;
+  padding-left: 7.125px !important;
+  padding-right: 7.125px !important;
+}
+@media (min-width: 560px) {
+  div.section-info {
+    padding-left: 14.25px !important;
+    padding-right: 14.25px !important;
+  }
+}
+@media (min-width: 820px) {
+  div.section-info {
+    padding-left: 14.25px !important;
+    padding-right: 36.25px !important;
+  }
+}
+
+header.page-header-b, header.chapter-intro1, header.chapter-intro2, header.chapter-intro3, header.chapter-intro4, header.chapter-intro5 {
+  margin-left: -25px !important;
+  margin-right: -25px !important;
+  margin-top: -25px !important;
+  padding-left: 7.125px !important;
+  padding-right: 7.125px !important;
+}
+@media (min-width: 560px) {
+  header.page-header-b, header.chapter-intro1, header.chapter-intro2, header.chapter-intro3, header.chapter-intro4, header.chapter-intro5 {
+    padding-left: 14.25px !important;
+    padding-right: 14.25px !important;
+  }
+}
+@media (min-width: 820px) {
+  header.page-header-b, header.chapter-intro1, header.chapter-intro2, header.chapter-intro3, header.chapter-intro4, header.chapter-intro5 {
+    padding-left: 14.25px !important;
+    padding-right: 14.25px !important;
+  }
+}
+
+.chapter-intro1 > figure {
+  z-index: 1;
+  margin-left: -14px !important;
+  margin-right: -14px !important;
+  margin-top: 0px;
+}
+.chapter-intro1 > figure img {
+  margin-bottom: 0;
+}
+
+/*------------------------------------------------------------------
+ * Width & Alignment Fixes (HACK)
+ *----------------------------------------------------------------*/
+/*body {
+   margin-left: 0 !important;
+   margin-right: 0 !important;
+}*/
+.bleed,
+.full-bleed {
+  margin-left: 0 !important;
+  margin-right: 0 !important;
+  padding-left: 7.125px !important;
+  padding-right: 7.125px !important;
+}
+@media (min-width: 560px) {
+  .bleed,
+  .full-bleed {
+    padding-left: 14.25px !important;
+    padding-right: 14.25px !important;
+  }
+}
+@media (min-width: 820px) {
+  .bleed,
+  .full-bleed {
+    padding-left: 14.25px !important;
+    padding-right: 14.25px !important;
+  }
+}
+
+figure .bleed,
+figure .full-bleed {
+  margin-left: 0 !important;
+  margin-right: 0 !important;
+  padding-left: 0 !important;
+  padding-right: 0 !important;
+}
+
+.bleed-right {
+  margin-right: 0 !important;
+  padding-right: 28.5px;
+}
+
+.bleed-left {
+  margin-left: 0 !important;
+  padding-left: 28.5px;
+}
+
+/*------------------------------------------------------------------
+ * MHHE Specific
+ *----------------------------------------------------------------*/
+/* padding for Banners*/
+.section-info, .part-info, .unit-info {
+  display: block;
+  margin-top: 0em;
+  margin-left: -3em;
+}
+
+.part-number, .unit-number, .section-number {
+  padding-left: 2em;
+}
+
+.part-title, .unit-title, .section-title {
+  padding-left: 2em;
+}
+
+/* body margins (small)*/
+body {
+  margin-left: 1em !important;
+}
+
+@media print {
+  div, aside, section {
+    background-color: transparent !important;
+    border: none !important;
+    -webkit-print-color-adjust: exact;
+    margin-top: 50mm;
+  }
+
+  aside {
+    margin-top: .5in !important;
+  }
+
+  .row figure.one-half {
+    float: left;
+  }
+  .row figure.one-half img {
+    width: 48% !important;
+  }
+  .row figure.one-fourth {
+    float: left;
+  }
+  .row figure.one-fourth img {
+    width: 24% !important;
+  }
+  .row figure.one-third {
+    float: left;
+  }
+  .row figure.one-third img {
+    width: 32% !important;
+  }
+  .row figure.two-thirds {
+    float: left;
+  }
+  .row figure.two-thirds img {
+    width: 65% !important;
+  }
+
+  figure.one-half img {
+    width: 48% !important;
+  }
+  figure.one-fourth img {
+    width: 24% !important;
+  }
+  figure.one-third img {
+    width: 32% !important;
+  }
+  figure.two-thirds img {
+    width: 65% !important;
+  }
+}
+
+
+/** SAMPLE CHAPTER FOR SBR**/
+.figure1_1
+{
+max-width:38em;
+}
+.figure1_5
+{
+max-width:32em;
+}
+.figure1_6
+{
+max-width:38em;
+}
+.figure1_7
+{
+max-width:38em;
+}
+.figure1_8
+{
+max-width:26em;
+}
+.figure1_9
+{
+max-width:29em;
+}
+.figure1_10
+{
+max-width:30em;
+}
+.digital
+{
+ border:none !important;
+}
+.digital:before {
+    color: #c90566;
+    padding: .2em .7em;
+    font-family: "proximanova", Verdana, Helvetica, sans;
+    text-transform: uppercase;
+    font-size: .6em;
+    font-weight: 600;
+    content:initial;
+}

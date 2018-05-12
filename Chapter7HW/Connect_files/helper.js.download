@@ -1,0 +1,359 @@
+function getURLParameter(name) {
+	return decodeURIComponent((new RegExp('[?|&]' + name + '=' + '([^&;]+?)(&|#|;|$)').exec(location.search)||[,""])[1].replace(/\+/g, '%20'))||null
+}
+
+function loadJSFile(url) {
+	var head = document.getElementsByTagName('head')[0];
+	var node = document.createElement('script');
+	node.setAttribute("type","text/javascript");
+	node.setAttribute("src", url);
+	head.appendChild(node);
+}
+
+function promiseJSFile(url) {
+	var promise = new Promise(function(resolve, reject) {
+
+		var script = document.createElement('script');
+		script.src = url;
+
+		script.addEventListener('load', function() {
+			resolve(script);
+		}, false);
+
+		script.addEventListener('error', function() {
+			reject(script);
+		}, false);
+
+		document.body.appendChild(script);
+
+	});
+
+	return promise;
+}
+
+function loadCSSFile(url) {
+	var head = document.getElementsByTagName('head')[0];
+	var node = document.createElement("link");
+	node.setAttribute("rel", "stylesheet");
+	node.setAttribute("type", "text/css");
+	node.setAttribute("href", url);
+	head.appendChild(node);
+}
+
+function getOS() {
+	// var userAgent = navigator.appVersion;
+	var userAgent = navigator.userAgent;
+
+	if (userAgent.indexOf("Windows") != -1) {
+		return "Windows";
+	} else if ( (userAgent.indexOf("iPhone") != -1) || (userAgent.indexOf("iPad") != -1) ) {
+		return "iOS";
+	} else if (userAgent.indexOf("Android") != -1) {
+		return "Android";
+	} else if (userAgent.indexOf("Mac OS") != -1) {
+		return "MacOSX";		
+	} else {
+		return "other";
+	}
+}
+
+function getOs() {
+	return getOS();
+}
+
+function getOSVersion() {
+	var userAgent = navigator.userAgent;
+	//list of userAgents: 
+	//http://www.webapps-online.com/online-tools/user-agent-strings
+
+	var userOS = getOS();
+	var w1 = null;
+	var verSep = null;
+	if ( userOS == "iOS" ) {
+		//Mozilla/5.0 (iPad; CPU OS 9_0_1 like Mac OS X) AppleWebKit/600.1.4 (KHTML, like Gecko) GSA/6.0.51363 Mobile/13A404 Safari/600.1.4
+		w1 = "OS ";
+		verSep = "_";
+	} else if ( userOS == "Android" ) {
+		//Mozilla/5.0 (Linux; U; Android 4.2.2; nl-nl; HTC_One_X Build/JDQ39) AppleWebKit/534.30 (KHTML, like Gecko) Version/4.0 Mobile Safari/534.30
+		w1 = "Android ";
+		verSep = ".";
+	} else {
+		return null;
+	}
+	
+	var words = userAgent.split(w1);
+	if ( words.length < 2 )
+		return null;
+	
+	words = words[1].split(" ");
+	words = words[0].split(verSep);
+
+	var ver = [];
+	for (var i = 0; i < words.length; i++) {
+		ver.push(parseInt(words[i]));
+	}
+	
+	return ver;
+}
+
+var environments = {
+	"prod" : ["newconnect.mheducation.com", "paam.mheducation.com"],
+	"demo" : ["newconnectdemo.mheducation.com", "paamdemo.mheducation.com", "ls-demo.mheducation.com", "demo.mhlearnsmart.com"],
+	"pqa" : ["newconnectpqa.mheducation.com", "paampqa.mheducation.com", "ls-loadtest.mheducation.com", "loadtest.mhlearnsmart.com"],
+	"qalv" : ["newconnectqalv.mheducation.com", "paamqalv.mheducation.com", "ls-qalive.mheducation.com", "qalive.mhlearnsmart.com", "cloud2.area9.dk", "cloud2.mhlearnsmart.com"],
+	"qastg" : ["newconnectqastg.mheducation.com", "paamqastg.mheducation.com"],
+	"qastg2" : ["ls-qastaging.mheducation.com", "qastaging.mhlearnsmart.com"],
+	"dev" : ["newconnectdev.mheducation.com", "ls-dev.mheducation.com", "devel2.mhlearnsmart.com", "ctr-qas.mheducation.com"],
+	"dev2" : ["newconnectdev2.mheducation.com", "cloud1.area9.dk", "ls-dev2.mheducation.com", "cloud1.mhlearnsmart.com"],
+    "localhost" : ["localhost","localhost.mheducation.com"],
+}
+
+var definedEnv = "";
+function defineEnv() {
+	if (definedEnv != "") return definedEnv;
+	var host = window.location.host;
+
+	Object.keys(environments).forEach(function (item) {
+		if (environments[item].indexOf(host) != -1) {
+			definedEnv = item;
+		}
+	});
+
+	if (definedEnv == "") definedEnv = "prod";
+	return definedEnv;
+}
+
+function getEnvAlias(env, host) {
+	var aliases = environments[env];
+	if (typeof aliases == "undefined") return host;
+
+	var index = aliases.indexOf(host);
+	if (index > 0)
+		return aliases[0];
+	else if (index == 0 && aliases.length > 1)
+		return aliases[1];
+	else
+		return host;
+}
+
+function launchNativeiOS() {
+	var ver = getOSVersion();
+	
+	//http://stackoverflow.com/questions/31891777/ios-9-safari-iframe-src-with-custom-url-scheme-not-working
+	if ( ver[0] >= 9 ) {
+		window.location = appURL;
+	} else {
+		launchNativeiOSScheme();
+	}
+}
+
+function launchNativeiOSScheme() {
+	var body = document.getElementsByTagName('body')[0];
+	var node = document.createElement('iframe');
+	node.setAttribute("style","display: none;");
+	node.setAttribute("src", appURL);
+	node.setAttribute("allow", "microphone *; camera *");
+	body.appendChild(node);
+	body.removeChild(node);
+	node = null;
+
+	// go to apple store if native app is not isntalled.
+	setTimeout(function (){ window.location = storeURL; }, 100);
+}
+
+ // constructing Universal Link based on predefined host alias
+function getiOSUL() {
+	var alias = getEnvAlias(defineEnv(), location.host);
+	return location.protocol + "//" + alias + "/flow/php/ctr_redirector.php";
+}
+
+function replaceUrl(newUrl) {
+	window.history.replaceState("","", newUrl);
+}
+
+function changeLocation(newUrl) {
+	window.location = newUrl;
+}
+
+function changeTopLocation(newUrl) {
+	window.top.location = newUrl;
+}
+
+function setCookie(name, value, exdays) {
+	var cookieText = name + "=" + value;
+	if( exdays != 0 ){
+	    var d = new Date();
+    	d.setTime(d.getTime() + (exdays*24*60*60*1000));
+		cookieText = cookieText  + "; " + "expires="+d.toUTCString();
+	}
+    document.cookie = cookieText;
+}
+
+function setGlobalCookie(name, value, domain, exMinute) {
+	var currentCookieValue = getCookie(name);
+	if(currentCookieValue != "" && currentCookieValue === value){
+		console.log("value for the cookie is already present : " +name);
+		return;
+	}
+	var cookieText = name + "=" + value;
+
+	if(domain){
+    	cookieText = cookieText  + "; " + "domain="+domain+";path=/;";
+    }
+
+	if( exMinute > 0 ){
+		var d = new Date();
+    		d.setTime(d.getTime() + (exMinute*60*1000));
+    		// setting expires for IE and max-age for others browsers
+		cookieText = cookieText  + "; " + "max-age="+(exMinute*60)+";expires="+d.toUTCString();
+	}
+    document.cookie = cookieText;
+}
+
+function getCookie(name) {
+    var nameStr = name + "=";
+    var ca = document.cookie.split(';');
+    for(var i=0; i<ca.length; i++) {
+        var c = ca[i];
+        while (c.charAt(0)==' ') c = c.substring(1);
+        if (c.indexOf(nameStr) == 0) return c.substring(nameStr.length, c.length);
+    }
+    return "";
+}
+
+function getBrowser() {
+	BrowserDetect.init();
+	return BrowserDetect.browser + " " + BrowserDetect.version;
+}
+
+function getResolution() {
+	return screen.width + "x" + screen.height;
+}
+
+function getVersion() {
+	return ""; // Stub for getVersion from js/flowswf.js
+}
+
+function shouldLaunchNativeContainer(userOS, urlParams, paramName, useUserChoice) {	
+	var userBrowser = (useUserChoice && getCookie("launchBrowser") == "true");
+	return urlParams.indexOf(paramName + "=no") < 0 && urlParams.indexOf(paramName + "=0") < 0 && !userBrowser;
+}
+
+var BrowserDetect = {
+	init: function () {
+		this.browser = this.searchString(this.dataBrowser) || "An unknown browser";
+		this.version = this.searchVersion(navigator.userAgent)
+			|| this.searchVersion(navigator.appVersion)
+			|| "an unknown version";
+		this.OS = this.searchString(this.dataOS) || "an unknown OS";
+	},
+	searchString: function (data) {
+		for (var i=0;i<data.length;i++) {
+			var dataString = data[i].string;
+			var dataProp = data[i].prop;
+			this.versionSearchString = data[i].versionSearch || data[i].identity;
+			if (dataString) {
+				if (dataString.indexOf(data[i].subString) != -1)
+					return data[i].identity;
+			}
+			else if (dataProp)
+				return data[i].identity;
+		}
+	},
+	searchVersion: function (dataString) {
+		var index = dataString.indexOf(this.versionSearchString);
+		if (index == -1) return;
+		return parseFloat(dataString.substring(index+this.versionSearchString.length+1));
+	},
+	dataBrowser: [
+		{
+			string: navigator.userAgent,
+			subString: "Chrome",
+			identity: "Chrome"
+		},
+		{   string: navigator.userAgent,
+			subString: "OmniWeb",
+			versionSearch: "OmniWeb/",
+			identity: "OmniWeb"
+		},
+		{
+			string: navigator.vendor,
+			subString: "Apple",
+			identity: "Safari",
+			versionSearch: "Version"
+		},
+		{
+			prop: window.opera,
+			identity: "Opera",
+			versionSearch: "Version"
+		},
+		{
+			string: navigator.vendor,
+			subString: "iCab",
+			identity: "iCab"
+		},
+		{
+			string: navigator.vendor,
+			subString: "KDE",
+			identity: "Konqueror"
+		},
+		{
+			string: navigator.userAgent,
+			subString: "Firefox",
+			identity: "Firefox"
+		},
+		{
+			string: navigator.vendor,
+			subString: "Camino",
+			identity: "Camino"
+		},
+		{       // for newer Netscapes (6+)
+			string: navigator.userAgent,
+			subString: "Netscape",
+			identity: "Netscape"
+		},
+		{
+			string: navigator.userAgent,
+			subString: "MSIE",
+			identity: "Explorer",
+			versionSearch: "MSIE"
+		},
+		{
+			string: navigator.userAgent,
+			subString: "Gecko",
+			identity: "Mozilla",
+			versionSearch: "rv"
+		},
+		{       // for older Netscapes (4-)
+			string: navigator.userAgent,
+			subString: "Mozilla",
+			identity: "Netscape",
+			versionSearch: "Mozilla"
+		}
+	],
+	dataOS : [
+		{
+			string: navigator.platform,
+			subString: "Win",
+			identity: "Windows"
+		},
+		{
+			string: navigator.platform,
+			subString: "Mac",
+			identity: "Mac"
+		},
+		{
+			string: navigator.userAgent,
+			subString: "iPhone",
+			identity: "iPhone/iPod"
+		},
+		{
+			string: navigator.platform,
+			subString: "Linux",
+			identity: "Linux"
+		}
+	],
+};	
+BrowserDetect.init();
+console.log("helper.js loaded!");
+

@@ -1,0 +1,50 @@
+// Functions to send CORS HTTP requests from
+// Flash Flow runner. For Google Analytics, etc...
+
+function flowKVL2dict (keyvaluelist) {
+	var result = {};
+	for(var ind = 0; ind < keyvaluelist.length; ++ind){
+		var kvi = keyvaluelist[ind];
+		if (kvi.structFields) {
+			// flowrunner
+			var kv = kvi.structFields;
+			result[kv[0]] = kv[1];
+		} else {
+			// flowswf
+			result[kvi.key] = kvi.value;
+		}
+	}
+	return result;
+}
+
+function nativeHTTPRequest(url, method, headers, params){
+	headers = flowKVL2dict(headers);
+	params = flowKVL2dict(params);
+	console.log(["UMHP", url, method, headers, params]);
+
+	$.ajax({
+		url: url,
+		method: method,
+		data: params,
+		crossDomain: true,
+		beforeSend: function(xhr) {
+			for(var k in headers){
+				xhr.setRequestHeader(k, headers[k]);
+			}
+		},
+		success: function(data, status, xhr) {
+			try {
+				nativeHTTPSuccess(data);
+			} catch (e) {
+				// no callback? ok
+			}
+		},
+		error: function(jqXHR, textStatus, errorThrown) {
+			try {
+				nativeHTTPError(textStatus);
+			} catch (e) {
+				// no callback? ok
+			}
+		}
+	});
+}

@@ -1,0 +1,4468 @@
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// region Annotator
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+var isIOS = /iPad|iPhone|iPod/.test(navigator.platform);
+
+annotator = {
+	//url : 'http://html1.mheducation.com/annotator/sync'
+	isInitialized : false
+}
+
+var _pageIndex;
+
+annotator.init = function(userId, chapterId, pageIndex, apiUrl, resetStorage, initialData) {
+	var self = this;
+	
+	if (self.isInitialized) {
+		var ann = $("body");
+		setupOfflinePlugin(ann, pageIndex);
+		return;
+	}
+
+	if (!self.isInitialized) Annotator.Plugin.TypePlugin = self.createTypePlugin();
+	self.userId = userId;
+	self.chapterId = chapterId;
+	self.url = apiUrl + "../annotator/sync";
+	self.isEditorShown = false;
+	
+	var isTouchDevice = Annotator.Plugin.Touch.isTouchDevice();
+	var forceTouch = getUrlParameter("annotatorforce") == "true";
+    
+    if (forceTouch || isTouchDevice) 
+		setupAnnotatorTouch();
+
+	Annotator.prototype.imgStarOff = fixScheme(sbScriptLocation + "images/smartbook/mobilereader/icon/star.png");
+	Annotator.prototype.imgStarOn = fixScheme(sbScriptLocation + "images/smartbook/mobilereader/icon/star-red.png");
+	Annotator.prototype.imgDontGetOff = fixScheme(sbScriptLocation + "images/smartbook/mobilereader/icon/question.png");
+	Annotator.prototype.imgDontGetOn = fixScheme(sbScriptLocation + "images/smartbook/mobilereader/icon/question-red.png");
+	if (forceTouch || isTouchDevice) {
+		Annotator.prototype.imgStarOff = fixScheme(sbScriptLocation + "images/smartbook/mobilereader/icon/star_.png");
+		Annotator.prototype.imgDontGetOff = fixScheme(sbScriptLocation + "images/smartbook/mobilereader/icon/question_.png");
+	}
+	
+	var ann = $("body")
+		.annotator()
+		.annotator('addPlugin', 'TypePlugin')
+		.annotator('addPlugin', 'Touch', {force: forceTouch})
+		.annotator('subscribe', 'annotationCreated', annotator.refresh)
+		.annotator('subscribe', 'annotationUpdated', annotator.refresh)
+		.annotator('subscribe', 'annotationDeleted', annotator.refresh)
+		.annotator('subscribe', 'annotationEditorShown', function() { 
+			$(".annotator-resize").hide(); 	// case 33721
+			self.isEditorShown = true;
+			if (window.sideOverlays) sideOverlays.isDisabled = true;
+			if (isTouchDevice) // case 33984
+				$(".annotator-checkbox label").css("color", "black"); 
+		})
+		.annotator('subscribe', 'annotationEditorHidden', function() { 
+			self.isEditorShown = false;
+			if (window.sideOverlays) sideOverlays.isDisabled = false;
+		});
+	
+	self.isInitialized = true;
+	
+	$(".annotator-create li").click(function(event) {
+		var aid = $(this).find("a").attr("id");
+		var btntype = null;
+		if (aid == "annotator_bookmark" || $(this).text() == "Bookmark")
+			btntype = "star";
+		else if (aid == "annotator_dontgetit" || $(this).text() == "I don\'t get it")
+			btntype = "dont-get";
+		else if (aid == "annotator_cancel" || $(this).text() == "Cancel") {
+			$(".annotator-create").parent().addClass("annotator-hide"); 
+			return false;
+		}
+		annotator.ann.onAdderClick(event, btntype);
+		$("#annotator-field-0").val(savedText);
+		$("#annotator-field-0").show();
+		$("#annotator-field-0").removeClass("allow-select").addClass("allow-select");
+		return false;
+	});
+	
+    if (isTouchDevice) {
+        $(".annotator-touch-widget.annotator-touch-controls").css("z-index", "12000"); // case 34738
+        $(".annotator-touch-widget.annotator-touch-selection-menu").css("z-index", "12000");
+        $(".annotator-touch-editor.annotator-touch-editor-menu").css("z-index", "12000");
+        $(".annotator-touch-viewer.annotator-touch-viewer-menu").css("z-index", "12000");
+    }
+
+	$(".annotator-button.annotator-add.annotator-focus").bind("click touchstart", function() {
+		$(".annotator-touch-widget.annotator-touch-controls").addClass("annotator-touch-hide");
+		$(".annotator-button.annotator-add.annotator-focus").attr("disabled", "disabled");
+	});
+	
+	var storageId = userId + "_" + chapterId;
+	if (resetStorage == "true")
+		window.localStorage.removeItem(storageId);
+	var needServerSync = ((typeof(initialData) == "undefined") || (initialData == "")) && !(storageId in window.localStorage);
+	storage = createStorage(userId, chapterId, storageId, self.url);
+	_pageIndex = pageIndex;
+	if (initialData !== undefined && initialData !== "")
+		storage.sync(JSON.parse(initialData));
+	setupOfflinePlugin(ann, pageIndex);
+	if (needServerSync)
+		storage.sync();
+
+	var sizelimitWarningHtml = '<div class="annotator-outer annotator-hide annotator-warning-sizelimit"><div class="annotator-widget" style="padding: 8px; font-size: 14px;">' +
+		'<p>For performance reasons, you can only select 1000 characters</p></div></div>';
+	if (isTouchDevice || forceTouch) {
+		var slPos = "bottom: 0px;position: fixed;";
+		if (isIOS) slPos = "top: 0px;position: absolute;";
+		sizelimitWarningHtml = '<div class="annotator-touch-widget annotator-warning-sizelimit" style="padding: 8px;font-size: 14px;'+slPos+'background: white;right: 0px;width:99%;">' + 
+			'<p style="text-align: center;">For performance reasons, you can only select 1000 characters</p></div>';
+	};
+	$(".annotator-wrapper").append(sizelimitWarningHtml);
+
+	$(".annotator-outer").addClass("noselect");
+	
+	fixAnnotatorUtilGetTextNodes();
+	limitAnnotatorNoteSize();
+	
+	//callflow_platform(["annotatorLoaded"]);
+    $('.annotator-notice').insertAfter("div.annotator-wrapper");
+    $('.annotator-outer').insertAfter("div.annotator-wrapper");
+    $('.annotator-touch-widget').insertAfter("div.annotator-wrapper");
+}
+
+function setupAnnotatorTouch() {
+	var hideClass = "";
+	if (!isIOS)
+		hideClass = " annotator-touch-hide";
+
+    Annotator.Plugin.Touch.prototype.template='<ul class="annotator-touch-widget annotator-touch-selection-menu annotator-touch-controls' + hideClass + '">\n' +
+    '<li>\n <a class="annotator-star-add annotator-focus"><img src="' + fixScheme(sbScriptLocation + "images/smartbook/mobilereader/icon/star_.png") + '">\n </img>\n '+Annotator._t("Bookmark")+'</a>\n </li>\n' +
+    '<li> <a class="annotator-dont-getit-add annotator-focus"><img src="' + fixScheme(sbScriptLocation + "images/smartbook/mobilereader/icon/question_.png") + '">\n </img>'+Annotator._t("I Don't Get It")+'</a>\n </li>\n ' +
+    '<li>\n  <a class="annotator-add annotator-focus"><img src="' + fixScheme(sbScriptLocation + "images/smartbook/mobilereader/icon/note_.png") + '">\n </img>'+Annotator._t("Note")+'</a>\n' +
+    '<a class="annotator-touch-toggle" data-state="off">'+Annotator._t("Start Annotating")+"</a>\n </li>\n </ul>\n";
+
+    Annotator.Editor.prototype.html =
+    "<div class=\"annotator-outer annotator-editor\">\n"+
+    "  <form class=\"annotator-widget\">\n"+
+    "     <ul class=\"annotator-listing\"></ul>\n" +
+    "     <ul class=\"annotator-touch-editor-menu\">\n" +
+    "     <li class=\"annotator-starred-save annotator-focus\"><img src=\"" + fixScheme(sbScriptLocation + "images/smartbook/mobilereader/icon/star_.png") + "\">\n </img>\n" + Annotator._t("Bookmark") + "</li>\n " +
+    "     <li class=\"annotator-dont-get-save annotator-focus\"><img src=\"" + fixScheme(sbScriptLocation + "images/smartbook/mobilereader/icon/question_.png") + "\">\n </img>\n" + Annotator._t("I Don't Get It") + "</li>\n" +
+    "      <li class=\"annotator-save annotator-focus\">\n <div>" + Annotator._t('Save') + "</div>\n </li>\n"+
+    "      <li class=\"annotator-cancel\"> <img src=\"" + fixScheme(sbScriptLocation + "images/smartbook/mobilereader/icon/trash.png") + "\">\n </img>\n </li>\n"+
+    "     </ul>\n"+
+    "  </form>\n"+
+	"</div>";
+
+    Annotator.Widget.prototype.checkOrientation = function() {
+        var current, offset, viewport, widget, window;
+        this.resetOrientation();
+        window = $(Annotator.Util.getGlobal());
+        widget = this.element.children(":first");
+        offset = widget.offset();
+        viewport = {
+        top: window.scrollTop(),
+        right: window.width() + window.scrollLeft()
+        };
+        current = {
+        top: offset.top,
+        right: offset.left + widget.width()
+        };
+        if ((current.top - viewport.top) < 0) {
+            this.invertY();
+        }
+        // Guarantee that on small screen, menu does not run off either the right or the left.
+        if ((current.right - viewport.right) > 0) {
+            this.element.css('left',0);
+        }
+        return this;
+    };
+    // Ensure that WKWebView scales CSS dimensions the same as UIWebView.
+    $('head').prepend('<meta name="viewport" content="initial-scale=1.0" />');
+}
+
+function limitAnnotatorNoteSize() {
+	var adder = annotator.ann.adder;
+	adder.subscribe('show', function() {
+		if (window.getSelection().toString().length > 1000)
+			if (!appParameters["isReadexMode"]) //LSTRE-456. Maybe we'll remove this subscriber completely
+				adder.hide();
+	});
+}
+
+function fixAnnotatorUtilGetTextNodes() {
+	var old = Annotator.Util.getTextNodes;
+	function isVisibleNode() {
+		return $(this.parentNode).is(':visible');
+	}
+	Annotator.Util.getTextNodes = function (jq) {
+		return old(jq).filter(isVisibleNode);
+	}
+}
+
+annotator.refresh = function() {
+	setTimeout(function() { annotatorFetch("annotatorFetchCallback") }, 1000);
+}
+
+annotator.getById = function(id) {
+	return $('.annotator-hl').filter(function(i, e) {
+		return $(e).data('annotation').id == id;
+	})[0];
+}
+
+annotator.getElementOffset = function(e) {
+	if ($(e).is('.annotator-wrapper')) return 0;
+	var parent = $(e).parent();
+	var offset = this.getElementOffset(parent[0]);
+	var contents = parent.contents();
+	for (var i = 0; i < contents.length; i++) {
+		var cur = contents[i];
+		if (cur == e) break;
+		offset += $(cur).text().length;
+	}
+	return offset;
+}
+
+annotator.scrollTo = function(id) {
+	var elem = this.getById(id);
+	if (elem)
+		scrollLoIntoViewEx($(elem), 2);
+}
+
+annotator.createTypePlugin = function() {
+	function TypePlugin(element, options) {
+	}
+	
+	function addCheckbox(annotator, id, label) {
+		var load = function(field, annotation) {
+			$(field).find('input').prop('checked', annotation[id] == 1);
+		}
+		var save = function(field, annotation) {
+			annotation[id] = $(field).find('input').is(':checked')? 1 : 0;
+		}
+		annotator.editor.addField({
+			type: 'checkbox', id: 'annotator-' + id,
+			label: label, load: load, submit: save
+		});
+	}
+
+	TypePlugin.prototype.pluginInit = function() {
+		addCheckbox(this.annotator, 'is_important', 'Bookmark');
+		addCheckbox(this.annotator, 'is_not_understood', 'I don\'t get it');
+	};
+
+	return TypePlugin;
+}
+
+annotator.setupHideViewer = function() {
+	var hideViewer = function() {
+		var now = Date.now()/1000, shown = this.viewerShownTime;
+		if (shown && now < shown + 0.5) return;
+		this.ann.viewer.hide(); 
+	}.bind(this);
+	
+	$(window).scroll(hideViewer);
+	//$(window).click(hideViewer);
+}
+
+annotator.showViewer = function(id) {
+	var elem = this.getById(id);
+	var ofs = $(elem).offset();
+	if (!ofs) return;
+	var body = $("body").offset();
+	var paddingTop = parseInt($("body").css("padding-top"));
+	var paddingLeft = parseInt($("body").css("padding-left"));
+	var pos = {left: ofs.left - body.left - paddingLeft, top: ofs.top - body.top - paddingTop};
+	this.viewerShownTime = Date.now()/1000;
+	this.ann.showViewer([$(elem).data("annotation")], pos);
+}
+
+annotator.isTouchViewerShown = function() {
+	return $(".annotator-touch-viewer").filter(":hidden").length <= 0;
+}
+
+annotator.yellowBackgroundHighlightStyle = 'background: rgba(255, 255, 10, 0.3);';
+
+annotator.setHighlightStyle = function(style) {
+	$('body').append(
+				$('<style>').append('.annotator-hl {' + style + '}')
+		);	
+}
+
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Callbacks for flow
+
+annotatorScrollTo = annotator.scrollTo.bind(annotator);
+annotatorShowViewer = annotator.showViewer.bind(annotator);
+
+function annotatorScrollToFirst() {
+	var elem = $("span[class='annotator-hl']");
+	scrollLoIntoViewEx($(elem), 2);
+}
+
+
+function annotatorFetch(callback) {
+	var toStr = function(v) 	{ return v === undefined? "" : v.toString(); }
+	var translate = function(e)	{
+		var quote = e.quote.replace(/\s+/g, ' ');
+		var offset = e.offset? e.offset : 0;
+		return [e.id, '', e.pageIndex, quote, e.text, '' + e.created, toStr(e.is_important), toStr(e.is_not_understood), '' + offset]; 
+	}
+	var rows = storage.list_all().map(translate);
+		callflow_platform([callback, JSON.stringify(rows).replace(/\\/g, "%5C"), _pageIndex.toString()]);
+}
+
+function annotatorShowAll() {
+	var elems = $("span[class='annotator-hl']");
+	$(elems).each(function(i) {
+		$(this).removeAttr("style");
+	});
+}
+
+function annotatorShow(ids) {
+	annotatorShowAll();
+	var arr = ids.split(";;");
+	arr.forEach(function(e, i) {
+		var elem = annotator.getById(e);
+		$(elem).css("background", "rgba(255, 255, 10, 0)");
+	});
+}
+
+function annotatorShowHighlight(id) {
+	annotatorShowAll();
+	var elem = annotator.getById(id);
+	$(elem).css("background", "rgba(94, 162, 225, 1)");
+}
+
+var savedText = "";
+
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// endregion Annotator
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// region Annotator plugin
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+function setupOfflinePlugin(annotator_, pageIndex) {
+	
+	if (typeof Annotator.Plugin.OfflinePlugin === 'undefined') {
+
+		function plugin(element, options) {}
+	
+		_pageIndex = pageIndex;
+		storage.externalCreateCallback = storage_externalCreateCallback;
+		storage.externalUpdateCallback = storage_externalUpdateCallback;
+		storage.externalDeleteCallback = storage_externalDeleteCallback;
+	
+		plugin.prototype.pluginInit = function() {
+			var ann = annotator.ann = this.annotator;
+			ann.subscribe('annotationCreated', onCreatedCallback);
+			ann.subscribe('annotationUpdated', onUpdatedCallback);
+			ann.subscribe('annotationDeleted', onDeletedCallback);
+		};
+		Annotator.Plugin.OfflinePlugin = plugin;
+
+		annotator_.annotator('addPlugin', 'OfflinePlugin');
+	}
+		
+	var list = storage.list_all();
+	list = list.filter(function(it) { return it.pageIndex == _pageIndex; }).map(cloneItem);
+	//console.log(JSON.stringify(list));
+	list.forEach(function(item) {
+		annotations[item.id] = item;
+	});
+	annotator.ann.loadAnnotations(list);
+	checkMissingAnnotations();
+}
+
+function checkMissingAnnotations() {
+	var missing_annotations = Object.keys(annotations).filter(function(id) { 
+			return annotations[id].ranges.length == 0;
+		});
+	if (missing_annotations.length > 0) {
+		storage.reportProblem({ missing_annotations: missing_annotations });
+	}
+}
+
+var annotations = {}	// to be moved to annotator
+
+function cloneItem2(it, item) {
+	var tags = ['quote', 'ranges', 'text', 'id', 'pageIndex', 'is_important', 'is_not_understood', 'created', 'updated', 'offset'];
+	tags.forEach(function(t) {
+		it[t] = item[t];
+	});
+	return it;
+}
+
+function cloneItem(item) {
+	return cloneItem2({}, item);
+}
+
+///////////////////////////////////////////////////////////////////
+
+storage_externalCreateCallback = function(it) {
+	//console.log('externalCreateCallback', it);
+	if (it.pageIndex != _pageIndex) return;
+	it = cloneItem(it);
+	annotations[it.id] = it;
+	it.internalUpdate = true;
+	annotator.ann.setupAnnotation(it);
+	delete it.internalUpdate;
+}
+
+function onCreatedCallback(item) {
+	//console.log('onCreatedCallback', item.internalUpdate);
+	if (item.internalUpdate) return;
+	item.pageIndex = _pageIndex;
+	item.created = Math.floor(Date.now()/1000);
+	item.updated = item.created;
+	item.offset = annotator.getElementOffset(item.highlights[0]);
+	item.id = storage.create(cloneItem(item));
+	annotations[item.id] = item;
+	storage.sync();
+}
+
+storage_externalUpdateCallback = function(it) {
+	//console.log('externalUpdateCallback', it);
+	if (it.pageIndex != _pageIndex) return;
+	var a = annotations[it.id];
+	cloneItem(a, it);
+	a.internalUpdate = true;
+	annotator.ann.updateAnnotation(a);
+	delete a.internalUpdate;
+}
+
+function onUpdatedCallback(item) {
+	if (item.internalUpdate) return;
+	console.log('onUpdated');
+	item.updated = Math.floor(Date.now()/1000);
+	storage.update(cloneItem(item));
+	storage.sync();
+}
+
+storage_externalDeleteCallback = function(id) {
+	//console.log('externalDeleteCallback', id);
+	//if (it.pageIndex != _pageIndex) return;
+	if (id in annotations) {
+		var a = annotations[id];
+		a.internalUpdate = true;
+		annotator.ann.deleteAnnotation(a);
+		delete a.internalUpdate;
+	} else {
+		console.error("Unknown id " + id);
+	}
+}
+
+function onDeletedCallback(item) {
+	if (item.internalUpdate) return;
+	console.log('onDeleted');
+	if (item.id)
+		storage.delete(item.id);
+	if (storage._queue.create.length != 0 || storage._queue.update.length != 0 || storage._queue.delete.length != 0)
+		storage.sync();
+}
+
+annotator.removeAllAnnotations = function() {
+	var ids = storage._items.map(function(v){ return v.id;});
+	ids.forEach(function(id) {
+		console.log(id);
+		storage.delete(id);
+	});
+	storage.sync();
+}
+
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// endregion Annotator plugin
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// region Annotator storage
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+var _workOffline = false;
+
+function createStorage(userId, bookId, storageId, serverUrl) {
+
+	var storage = {
+		_items: [], 
+		_queue: {
+			userId: userId,
+			bookId: bookId,
+			revision: 0, 
+			create: [], 
+			update: [], 
+			delete: []
+		},
+		externalCreateCallback: function(item) {},
+		externalUpdateCallback: function(item) {},
+		externalDeleteCallback: function(id) {},
+		storageId: null,
+		url: serverUrl,
+		
+		list_all: function() {
+			return this._items;
+		},
+		
+		load_from_storage: function() {
+			if (this.storageId && this.storageId in window.localStorage) {
+				var data = JSON.parse(window.localStorage[this.storageId]);
+				this._items = data.items;
+				this._queue = data.queue;
+			}
+		},
+		
+		save_to_storage: function() {
+			if (this.storageId)
+				window.localStorage[this.storageId] = JSON.stringify({items: this._items, queue: this._queue});
+		},
+		
+		clear_storage: function() {
+			if (this.storageId)
+				delete window.localStorage[this.storageId];
+		},
+		
+		get_revision: function() {
+			return this._queue.revision;
+		},
+		
+		create: function(item) {
+			item.id = $.md5(Date.now() + JSON.stringify(item));
+			this._items.push(item);
+			this._queue.create.push(item);
+			this.save_to_storage();
+			return item.id;
+		},
+		
+		replace_ : function(v, it) {
+			for(var i = 0; i < v.length; i++)
+				if (v[i].id == it.id) {
+					v[i] = it;
+					return true;
+				}
+			return false;
+		},
+		
+		update: function(it) {
+			var queue = this._queue;
+			this.replace_(this._items, it);
+			if (!this.replace_(queue.create, it))
+				if (!this.replace_(queue.update, it))
+					queue.update.push(it);
+			this.save_to_storage();
+		},
+		
+		delete: function(id) {
+			var queue = this._queue;
+			var just_created = queue.create.filter(function(it) { return it.id == id; }).length > 0;
+			queue.create = queue.create.filter(function(it) { return it.id != id; });
+			queue.update = queue.update.filter(function(it) { return it.id != id; });
+			if (!just_created)
+				queue.delete.push(id);
+			this._items = this._items.filter(function(it) { return it.id != id; });
+			this.save_to_storage();
+		},
+		
+		createExt: function(item) {
+			this._items.push(item);
+			this.externalCreateCallback(item);
+		},
+
+		updateExt: function(item) {
+			this.replace_(this._items, item);
+			this.externalUpdateCallback(item);
+		},
+
+		deleteExt: function(id) {
+			this._items = this._items.filter(function(it) { return it.id != id; });
+			this.externalDeleteCallback(id);
+		},
+		
+		sync: function(initialData) {
+			if (_workOffline) {
+				callflow_platform(["annotatorLoaded"]);
+				return;
+			}
+
+			var self = this;
+			var queue = this._queue;
+			//console.log('revision ', queue.revision);
+			//var params = $.param({json: JSON.stringify(queue)});
+			//$.get(this.url + "?" + params, function(data) {
+			doSync = function(data) {
+				queue.revision = data.revision;
+				//console.log('revision ', queue.revision);
+				queue.create = [];
+				queue.update = [];
+				queue.delete = [];
+				//console.log(data);
+				data.create.forEach(function(it) {self.createExt(it);});
+				data.update.forEach(function(it) {self.updateExt(it);});
+				data.delete.forEach(function(id) {self.deleteExt(id);});
+				self.save_to_storage();
+				callflow_platform(["annotatorLoaded"]);
+			}
+			if (initialData !== undefined) {
+				self._items = [];
+				doSync(initialData);
+			} else
+				$.post(this.url, {json: JSON.stringify(queue)}).done(doSync).fail(function() {
+					console.warn('error loading ' + self.url);
+				});
+		},
+		
+		reportProblem: function(info) {
+			var url = this.url.replace('/sync', '/report');
+			var params = $.param({json: JSON.stringify(info)});
+			$.get(url + "?" + params);
+		}
+
+	}
+
+	if (storageId) {
+		storage.storageId = storageId;
+		storage.load_from_storage();
+	}
+
+	return storage;
+
+}
+
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// endregion Annotator storage
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+function includeScript(url, callback) {
+	var head = document.getElementsByTagName('head')[0];
+	var script = document.createElement('script');
+	script.type = 'text/javascript';
+	script.src = url;
+	
+	script.onreadystatechange = callback(url);
+	script.onload = callback(url);
+	
+	head.appendChild(script);
+}
+
+function fixScheme(url) {
+	var currentScheme = window.location.href.split("://")[0];
+	if (currentScheme == "https")
+		return url.replace("http://", "https://");
+	return url;
+}
+
+function UpdateAudio() {
+	EmbedAudioShortPlayer();
+	if (!window.AudioPlayer) {
+		var callback = function() {
+			return function() {
+				if (!!window.AudioPlayer)
+					EmbedAudioPlayer();
+			}
+		}
+		includeScript(fixScheme(sbScriptLocation + "audio-player.js"), callback);
+	} else 
+		EmbedAudioPlayer();
+}
+
+function EmbedAudioShortPlayer() {
+	function getBookId(node) {
+		if (!node) return "";
+		if (node.tagName == "P" && node.id) {
+			var t = node.id.split("_");
+			if (t.length == 4 && t[0] == "id")
+				return t[1];
+		}
+		return getBookId(node.parentNode);
+	}
+	$(".audioshortplayer").each(function(idx, node) {
+		var filename = node.title;
+		node.title = "";
+		var url = "../assets/" + getBookId(node) + "/" + filename;
+		
+		var p1 = $("<param>")
+					.attr("name", "src")
+					.attr("value", fixScheme(sbScriptLocation + "images/smartbook/media/audioshortplayer.swf"));
+		var p2 = $("<param>")
+					.attr("name", "flashvars")
+					.attr("value", "mp3url=" + url);
+		var obj = $("<object>")
+			.attr("type", "application/x-shockwave-flash")
+			.attr("width", 21).attr("height", 21)
+			.append(p1).append(p2);
+		
+		$(node).append(obj);
+	});
+}
+
+var audioPlayer = {};
+
+audioPlayer.makeUrlBig = function (bookId, filename) {
+	return "../assets/" + bookId + "/" + filename;
+}
+	
+function EmbedAudioPlayer() {
+	AudioPlayer.setup(fixScheme(sbScriptLocation + "images/smartbook/media/audioplayer.swf"), {width: 290});
+	$(".asset_audio_botsegi").each(function(idx, node) {
+		var filename = node.title;
+		node.title = "";
+		var bookId = node.id.split("_")[1];
+		var url = audioPlayer.makeUrlBig(bookId, filename);
+		var clr = "1086d9";
+		AudioPlayer.embed(node.id, {  
+			soundFile: url, noinfo: "yes", width: 290, transparentpagebg: "yes",
+			lefticon: clr, voltrack: clr, rightbghover: clr, 
+			righticon: clr, tracker: clr, loader: "333333"
+		});
+	});
+}
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// region Coach
+// this part is used by Smartbook only
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+var texts;
+var curText = 0;
+var isPaused = false;
+var isSoundOnly = 0;
+var isSoundOn = 0;
+var isTextOnly = false;
+var startPoint = 0;
+var curPoint  = 0;
+var endPoint = 0;
+
+function disableAnnotatorWrapperLinks() {
+    // Unfortunately "disabled" cannot be used for <a>.
+    // Only tabindx=-1 works
+    $('a').prop('tabIndex', "-1");
+}
+
+function enableAnnotatorWrapperLinks() {
+   $('a').prop('tabIndex', "");
+}
+
+function showPage(page, init) {
+    console.log('JS showPage ' + page + " " + init);
+    if (page >= 0 && page < texts.length) {
+        $( "#coach_text" ).text(texts[page]);
+        $( "#coach_text" ).css('font-size', $("body").css('font-size'));
+        curText = parseInt(page);
+        if (String(init).toLowerCase() !== 'true') {
+            if (isSoundOnly === 0) checkButtons(false);
+            resetSpeechProgress();
+        }
+    }
+}
+
+function progressBarAnimationStop() {
+    curPoint = $("#speechProgress").width();
+    $("#speechProgress").stop();
+}
+
+function progressBarAnimation(endPoint) {
+    var timer = 15000;
+
+    $("#speechProgress").animate({
+        width: endPoint + "px"
+    }, timer);
+}
+
+function resetSpeechProgress() {
+    progressBarAnimationStop();
+    updateSpeechProgress();
+    if (!isPaused) progressBarAnimation(endPoint);
+}
+
+function checkButtons(init) {
+    if (init) {
+        $("#backArrow").click(function() { if (curText > 0) callflow_platform(['prevPage']); });
+        $("#nextArrow").click(function() { if (curText < texts.length - 1) callflow_platform(['nextPage']); });
+    }
+    function set(id, enabled) {
+        switchClass("#"+id, id, id + "Disable", enabled? 0 : 1);
+    }
+    set("backArrow", curText > 0);
+    set("nextArrow", curText + 1 < texts.length);
+}
+
+function updateSpeechProgress() {
+    startPoint = $("#progressBar").width() / texts.length * curText;
+    curPoint = startPoint;
+    $("#speechProgress").css("width", startPoint);
+    endPoint = $("#progressBar").width() / texts.length * (curText + 1);
+}
+
+function showCoach(text, soundOnly, isPause, soundOn, textOnly) {
+    disableAnnotatorWrapperLinks();
+
+    texts = text.split('_');
+    isPaused = false;
+    isSoundOnly = soundOnly / 1;
+    isSoundOn = (soundOn === "true") ? 1 : 0;
+    isTextOnly = textOnly === "true";
+
+    var coach = $("<div>")
+        .attr("id", "coach")
+        .css("position", "fixed")
+        .css("z-index", "10000")
+        .html(coachHtml());
+    $("body").append(coach);
+
+    initControls();
+
+    showPage(0, true);
+
+    $("#soundBlock").focus();
+}
+
+function initControls() {
+    checkButtons(true);
+
+    if (!isTextOnly) {
+        changeMode(true);
+        changePause(true);
+        changeSound(true);
+        $("#speechProgressCell").append(getProgressBar("speechProgress"));
+
+        $("#soundBlock").click(function() { changeSound(false) });
+        $("#playControlBlock").click(function() { changePause(false) });
+        $("#ccBlock").click(function() { changeMode(false) });
+    } else {
+        $(".sound_controls").hide()
+    }
+
+    $("#coach_close_button").click(function() { callflow_platform(['hideCoach']); });
+    $(".coach_control_button, #coach_close_button, .coach_text_block_button").focus(function() { $(this).addClass("focused") });
+    $(".coach_control_button, #coach_close_button, .coach_text_block_button").blur(function() { $(this).removeClass("focused") });
+}
+
+function hideCoach() {
+    enableAnnotatorWrapperLinks();
+    $("#coach").remove();
+}
+
+function getProgressBar(id) {
+    var progressBar = $("<div>")
+        .attr("id", "progressBar")
+        .toggleClass("progress_bar")
+        .css({
+            "position": "relative",
+            "background-color": "#FFF",
+            "border": "1px solid #D1D3D2",
+            "border-radius": "5px",
+            "padding": "2px",
+            "margin": "0px 8px 3px 3px",
+            "width": "175px"
+        });
+
+    var progressBarCurrent = $("<div>")
+        .attr("id", id)
+        .css({
+            "height": "3.5px",
+            "width": "0px",
+            "background-color": "#373737",
+            "border-radius": "3px"
+        });
+
+    progressBar.append(progressBarCurrent);
+    return progressBar;
+}
+
+function coachHtml() {
+    var html = 
+    "<div id='coach_form'>"
+        + "<div class='coach_picture'>"
+            + "<div class='coach_picture_outter'>"
+                + "<div class='coach_picture_inner'>"
+                    + "<img height='90px' src=\"" + fixScheme(sbScriptLocation + "images/selfassess_ico.png") + "\"/>"
+                + "</div>"
+            + "</div>"
+        + "</div>"
+        + "<div id='coach_bubble' style='width: 335px; background-color: #FDFDFD'>"
+            + "<ul>"
+                + "<li align='right'><button id='coach_close_button'></button></li>"
+                + "<li id='text_block'><ul>"
+                    + "<li> <button id='backArrow' class='coach_text_block_button'></button></li>"
+                    + "<li><p id='coach_text' class='coach_text'></p></li>"
+                    + "<li> <button id='nextArrow' class='coach_text_block_button'></button></li>"
+                + "</ul><hr class='sound_controls' /></li>"
+                + "<li id='coach_controls' class='sound_controls'><ul>"
+                    + "<li> <button id='soundBlock' class='coach_control_button'></button></li>"
+                    + "<li> <button id='playControlBlock' class='coach_control_button'></button></li>"
+                    + "<li id='speechProgressCell'></li>"
+                    + "<li> <button id='ccBlock' class='coach_control_button'></button></li>"
+                +"</ul></li>"
+            + "</ul>"
+        + "</div>"
+    + "</div>";
+
+    // Lock focus in coach form
+    $('body').keydown(function(e){
+        if(e.which == 9) { // tab key
+            if (isSoundOn == 1 && $("#ccBlock").is(":focus") && !e.shiftKey) {
+                $("#coach_close_button").focus();
+                e.preventDefault();
+            } else if (isSoundOn == 0 && $("#soundBlock").is(":focus") && !e.shiftKey) {
+                $("#coach_close_button").focus();
+                e.preventDefault();                
+            } else if ($("#coach_close_button").is(":focus") && e.shiftKey) {
+                if (isSoundOn == 1) $("#ccBlock").focus(); else $("#soundBlock").focus();
+                e.preventDefault();                
+            }
+        }
+    });    
+
+    return html;
+}
+
+function changeSound(init){
+    if (!init) {
+        isSoundOn = 1 - isSoundOn;
+        callflow_platform(["switchCoachSound"]);
+    }
+    if (isSoundOn) {
+        $("#playControlBlock").show();
+        if (!isPaused) resetSpeechProgress();
+        $("#speechProgressCell").show();
+        $("#ccBlock").show();
+    } else {
+        $("#playControlBlock").hide();
+        $("#speechProgressCell").hide();
+        $("#ccBlock").hide();
+        if ($("#ccBlock").hasClass("cc")) {changeMode(false);}
+    }
+    switchClass("#soundBlock", "soundOff", "soundOn", isSoundOn? 1 : 0);
+}
+
+function changePause(init) {
+    if (!init) {
+        isPaused = !isPaused;
+        callflow_platform(['pause']);
+    }
+
+    if (isPaused) {
+        if (!init) progressBarAnimationStop();
+    } else {
+        if (!init) progressBarAnimation(endPoint);
+    }
+    switchClass("#playControlBlock", "pause", "play", isPaused? 1 : 0);
+}
+
+function changeMode(init) {
+    if (!init) {
+        isSoundOnly = 1 - isSoundOnly;
+        callflow_platform(["changeOnlySound"]);
+    }
+
+    if (isSoundOnly === 1) {
+        $("#text_block").hide();
+        
+        $("#ccBlock").removeClass("nocc").addClass("cc");
+    } else {
+        $("#text_block").show();
+
+        $("#ccBlock").removeClass("cc").addClass("nocc");
+
+        checkButtons(false);
+    }
+}
+
+function updateCoachPosition() {
+    $('#coach').css("left", 50 + "px");
+    $('#coach').css("top", $(window.top).height() - $('#coach').height() - 110);
+}
+
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//  endregion Coach
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// region Colors 
+// this part is used by EReader only
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+function backStyleBlack() {
+	backStyleReset();
+	$('#back_style').attr("href", fixScheme(sbCSSLocation + "black.css"));
+	$( ":header, p, pre, a, section, span" ).each( function() {
+		if($(this).closest('.glossarydesc, .footnotedesc, .annotator-outer, .sb-reader-popup').length == 0) {
+			$( this ).css( "color", "#FFF" );
+			$(this).css("background-color", "#000");
+		}
+	});
+}
+
+function backStyleSepia() {
+	backStyleReset();
+	$('#back_style').attr("href", fixScheme(sbCSSLocation + "sepia.css"));
+	$( ":header, p, pre, a, section, span" ).each( function() {
+		if($(this).closest('.glossarydesc, .footnotedesc, .annotator-outer, .sb-reader-popup').length == 0) {
+			$( this ).css( "color", "#3f2a1b" );
+			$(this).css("background-color", "#f5efdc");
+		}
+	});
+}
+
+function backStyleReset() {
+	if ($('#back_style').attr("href") != "")
+		$('#back_style').attr("href", "");
+
+	$( ":header, p, pre, a, section, span" ).each( function() {
+		if($(this).closest('.glossarydesc, .footnotedesc, .annotator-outer, .sb-reader-popup').length == 0) {
+			$( this ).css( "color", "" );
+			$(this).css("background-color", "");
+		}
+	});
+}
+
+$(document).ready(function() {
+	$('head').append('<link id="back_style" rel="stylesheet" href="" />');
+
+	iBackStyle = getUrlParameter("backStyle");
+	if (iBackStyle==1)
+		backStyleBlack();
+	else if (iBackStyle==2)
+		backStyleSepia();
+});
+
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// endregion Colors 
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// region Some common functions
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+var appParameters = {isJSTarget:false, isReadexMode:false};
+
+function setIsJSTarget() { //remove after next release - use setAppParameter instead
+    appParameters.isJSTarget = true;
+}
+
+function setAppParameter(paramName, value) {
+    if(value == "true")
+        appParameters[paramName] = true;
+    else if(value == "false")
+        appParameters[paramName] = false;
+    else appParameters[paramName] = value;
+}
+
+function setVisibility() {
+    $("body").css("visibility", "visible");
+}
+
+function GotoAnchor(id) {
+    var offset = $("#" + id).offset();
+    if (typeof offset !== "undefined") {
+        if(isIOS && appParameters.isJSTarget)
+            window.frameElement.parentElement.scrollTop = offset.top;
+        else
+            $('html, body').scrollTop(offset.top);
+    }
+}
+
+var bodyWidthBehaviourValue = 0;
+var currentFontSize = 100; //used in Firefox only
+var currentBodyWidth;
+var isFirefox = typeof InstallTrigger !== 'undefined';
+var isIE = /*@cc_on!@*/false || !!document.documentMode;
+var isEdge = !isIE && !!window.StyleMedia;
+var isLIN = false;
+
+function setBodyWidth(value) {
+    var screenWidth;
+    currentBodyWidth = value;
+    if (mobile) {      
+       screenWidth = (window.innerWidth * (currentFontSize / 100.0) - 80);       
+    } else {
+        screenWidth = (window.innerWidth * (currentFontSize / 100.0) - 135);
+    }
+    $('body').width(screenWidth);
+    bodyWidthBehaviourValue = parseInt(value) > 0 ? 1 : 0;
+    switchClass('body', 'wide', 'narrow_mode', bodyWidthBehaviourValue);
+}
+
+// Maybe we should use it for smartbook too.
+function setEreaderBodyWidth(value) {
+    bodyWidthBehaviourValue = parseInt(value);
+    switchClass('body', 'ereader_wide', 'ereader_narrow', bodyWidthBehaviourValue);
+}
+
+// tries a few times to set focus on the element
+function ensureFocus(elem, attempt) {
+    if (!elem) return;
+    attempt = attempt || 2;
+    if (attempt < 0) return;
+
+    elem.focus();
+    if (elem.ownerDocument.activeElement != elem) {
+        setTimeout(function () { ensureFocus(elem, attempt-1); }, attempt > 0 ? 500 : 2500);
+    }
+}
+
+function focusOnIFrame() {  // case 30857
+    try {
+        if (!window.parent.$) {
+            ensureFocus(window);
+            return;
+        }
+    } catch(e) {
+        return;
+    }
+    ensureFocus(window.parent.$('iframe')[0]);
+}
+
+// target:
+// 0 - top
+// 1 - bottom
+// 2 - 1/4 from top
+// 3 - 1/4 from bottom (i.e. 3/4 from top)
+// 4 - 1/2 from bottom (i.e. 1/2 from top)
+function calcOfsWithTarget(ofs, wh, eh, target) {
+    switch (target) {
+        case 0: break;
+        case 1: ofs -= Math.max(wh - eh, 0); break;
+        case 2: ofs -= Math.max(wh - eh, 0) / 4; break;
+        case 3: ofs -= Math.max(wh - eh, 0) * 3 / 4; break;
+        default: break; // the same as 0
+    }
+    return ofs;
+}
+
+function scrollLoIntoViewEx(element, target) {
+    console.log('scrollLoIntoViewEx(element: ' + element.attr("class") + '; target: ' + target + ')');
+
+	if ($(window).height() == 0) {
+        setTimeout(function() { scrollLoIntoViewEx(element, target); }, 100);
+		return;
+	}
+
+    if (element != null && typeof element.offset() !== "undefined") {
+        var offset = element.offset();
+        var _ofs = offset.top;
+        var _wh = $(window).height(); // visible window height
+        var _eh = element.height(); // element height
+        _ofs = calcOfsWithTarget(_ofs, _wh, _eh, target);
+        console.log('scrollLoIntoViewEx(_wh: ' + _wh + '; _eh: ' + _eh + '; _ofs: ' + _ofs + ')');
+        $('html, body').animate({
+            scrollTop: _ofs
+        }, 400, function() { 
+            if (getUrlParameter("ereader") == "" && window.checkOverlayButtons) updateLocalHighlightedTopics();
+        });
+    }
+}
+
+function setPageAnchors(anchors) {
+    selector = anchors.split(",").map(function(entry) { return "#" + entry; }).join(", ");
+    pages = $(selector);
+}
+
+function initLIN() {
+    $(".annotator-wrapper").find("img")
+        .css("cursor", "pointer")
+        .click(function() {
+            largeImageNavigator(this.currentSrc);
+        });
+}
+
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// endregion Some common functions
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// region Ereader
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+var scrollToTextString = "";
+var isFrameInitialized = false;
+
+function checkEpubContainer() {		// is that ereader only?
+    if ($("#epubContent").length > 0) {
+        console.log("epubContent exist in " + String(window.location.href));
+        callflow_platform(["decryptHtml", String(window.location.href)]);
+    }
+}
+
+function changeHtml(newHtml) {
+    $("#epubContent").html(newHtml);
+	interceptAllLinksInDocument("epubContent");
+}
+
+function changeBodyHtml(newHtml, urlStr, bodyClasses) {
+	if( $("base").attr("href") != urlStr ) {
+		q = urlStr.indexOf("?");
+		url = (q == -1) ? urlStr : urlStr.substring(0,q);
+		ls = url.lastIndexOf("/");
+		if (-1!=ls) {
+			baseurl = url.substring(0, ls+1);
+			if (baseurl != $("base").attr("href")) {
+				$("base").attr("href", baseurl );
+			}
+		}
+	}
+    $("#wrapperBody").html(newHtml);
+    var bodyClass = 'wide';
+    if (bodyWidthBehaviourValue != 0)
+    	bodyClass = 'narrow_mode';
+    $("body").attr("class", bodyClass);
+    $("body").addClass(bodyClasses);
+    initialFn(urlStr);
+}
+
+function executeJS(path) {
+	$.getScript( path );
+}
+
+function resetPageStylesheets() {
+	$('link[class=page_specific]').remove();
+}
+
+function addPageStylesheet(path) {
+	$("head").append(
+		$("<link>")
+			.attr("class", "page_specific")
+			.attr("rel", "stylesheet")
+			.attr("type", "text/css")
+			.attr("href", path)
+	);
+}
+
+function addWidgetsOption() {
+    $("iframe").each(function(i, el) {
+        el.src = el.src + "&ereader=1&widget=1";
+        //el.contentDocument.body.style.visibility = "visible";
+    });
+}
+
+function ereader_setupAudioPlayer() {
+	audioPlayer.makeUrlBig = function (bookId, filename) {
+		return "../stuff/assets/" + bookId + "/" + filename;
+	};
+	UpdateAudio();
+}
+
+function ereader_onload(urlStr) {
+
+    $("img").error(function() { $(this).hide(); });
+    modifyAllImageTags();
+
+    console.log("document ready");
+
+	$("body").css("visibility", "visible");
+
+	//addWidgetsOption();
+
+	isEztMode = getUrlParameter("EZTMode") == "true"; 
+	isPhoneScreen = getUrlParameter("isPhoneScreen") == "true";
+	isTestoriginalcontent = getUrlParameter("testoriginalcontent") == "1";
+
+	//interceptAllLinksInDocument((!getUrlParameter("testframe")) ? "" : "wrapperBody");
+	interceptAllLinks();
+	
+	isEbookMode = true;
+
+	if (!getUrlParameter("widget")) {
+		var userId = getParameterFromStr("userId", urlStr); 
+		var pageIndex = getParameterFromStr("pageIndex", urlStr); 
+		var pageCount = getParameterFromStr("pageCount", urlStr); 
+		var bookId = getParameterFromStr("bookId", urlStr); 
+		var apiUrl = getParameterFromStr("apiUrl", urlStr); 
+		var resetStorage = getParameterFromStr("resetStorage", urlStr);
+		
+		if (userId && pageIndex != "" && bookId && !isEztMode) {
+			annotator.init(userId, bookId, pageIndex, apiUrl, resetStorage);
+			annotator.setHighlightStyle('border-bottom: 2px solid #00F9FF; line-height: 1.4;');
+			annotator.setupHideViewer();
+			viewStat.init({
+				userId: userId, bookId: bookId, pageIndex: pageIndex
+			}, apiUrl);
+		}
+		var bodyWidth = getParameterFromStr("bodyWidth", urlStr); 
+		if (mobile) {
+	        $('body').addClass("phone");
+	    } else if (isTestoriginalcontent) {
+	    	$('body').addClass("original_content_mode");
+	    } else {
+			setEreaderBodyWidth(bodyWidth);			
+		}
+		
+		/* http://process.area9.dk/cases/default.asp?37082
+		var isFirstPage = getParameterFromStr("isFirstPage", urlStr); 
+		var isLastPage = getParameterFromStr("isLastPage", urlStr); 
+		SetupFlipOverlays(isFirstPage, "0", isLastPage, "0");*/
+
+		var showBackButton = getUrlParameter("showbackbutton") == "1"; 
+		if (showBackButton)
+			initBackButton();
+
+		setTimeout(function() { callflow_platform(['OnLoad']) }, 500);
+		focusOnIFrame();
+		setTimeout(checkEpubContainer, 500);
+
+		if (!mobile)
+			$(window).keydown(function(e) {
+    	    	if (e.ctrlKey && e.which == 109) {
+        	    	e.preventDefault();
+            		callflow_platform(["changeFontSizeCallBack", String(-1)]);
+		      	}
+    	    	else if (e.ctrlKey && e.which == 107) {
+        			e.preventDefault();
+        			callflow_platform(["changeFontSizeCallBack", String(1)]);
+	        	}
+    		});
+
+	    $(document).keyup(function(e) {
+			if (annotator.isEditorShown) return;
+			if (e.keyCode == 37 || e.keyCode == 39)
+				e.preventDefault();
+			callflow_platform(["KeyUp", String(e.keyCode)]);
+	    });
+
+
+		var searchQuery = getUrlParameter("searchQuery");
+		var docId = getUrlParameter("searchDocId");
+		if (getUrlParameter("testframe")) {
+			searchQuery = getParameterFromStr("searchQuery", urlStr);
+			docId = getParameterFromStr("searchDocId", urlStr);
+		}
+
+		if (searchQuery != "") {
+			var query = decodeURIComponent(searchQuery);
+			searchServiceInitAndSearch("", query, docId);
+		}
+
+		isFrameInitialized = true;
+	}
+
+	var isResizing = false;
+
+	window.onresize = function() {
+		if(!isResizing){
+			isResizing = true;
+			setTimeout(function(){
+				updateElementsOffsetTop();
+				isResizing = false;
+			}, 1000);
+		}
+		if (backButtonExist())
+    		updateBackButtonPosition();
+    }
+
+    $(window).scroll(function() { 
+        try {
+            checkPagesPosition();
+        } catch(e) {
+            console.log(e);
+        }
+    });
+	
+	try { window.parent.Typekit.load(); } catch(e) {}	// fix fonts (case 34908)
+	
+	if ("none" == $("body").css("-ms-user-select"))		// fix text selection in IE (case 38354)
+		$("body").css("-ms-user-select", "text");
+	
+	setupIndexElements();
+	ereader_setupAudioPlayer();
+}
+
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// endregion Ereader
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+/**
+ * region sb_flow_callback.js
+ * This section is for flow calling when there is a need to do callback after flow computes
+**/
+
+callbacker = {
+	isAvailable : undefined,
+	next_callback_id: 0,
+	callbacks : {},
+	popCallback: function(callbackId) {
+		var a = this.callbacks[callbackId];
+		if(a !== undefined){
+			delete this.callbacks[callbackId];
+		}
+		return a;
+	},
+	pushCallback: function(callbackFn) {
+		if(typeof(callbackFn) !== 'function'){
+			return;
+		}
+		this.callbacks[this.next_callback_id] = callbackFn;
+		return this.next_callback_id++;
+	}
+}
+
+function setCallbacksAvailable() { // maybe add parameter
+	callbacker.isAvailable = true;
+}
+
+function callflowCallbackable(functionname, args, availableCallbackFn, unavailableCallbackFn) {
+	if(callbacker.isAvailable){
+		var callbackId = callbacker.pushCallback(availableCallbackFn).toString();
+		var callArgument = [functionname, callbackId].concat(args);
+
+		callflow_platform(callArgument);
+	} else {
+		if(unavailableCallbackFn !== undefined)
+			unavailableCallbackFn();
+	}
+}
+
+function callbackRunById(callbackId){
+	var callbackIdInt = parseInt(callbackId);
+	var callback = callbacker.popCallback(callbackIdInt);
+	if(callback === undefined){
+		return;
+	}
+
+	if(arguments.length > 1){
+		// building array of arguments
+		// Important: should not slice on arguments because it prevents optimizations in JavaScript engines (V8 for example).
+		// But we try
+		var argArray = Array.prototype.slice.call(arguments)
+		callback.apply(null, argArray.slice(1));
+	} else {
+		callback();
+	}
+}
+
+/**
+ * end region sb_flow_callback.js
+**////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// region Glossary
+// this part is used by Smartbook only
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+var glossary = null;
+var glossaryInitialized = false;
+var remarks = null;
+var remarksInitialized = false;
+
+
+function ExecuteXmlData(_url, data, onError, isGlossary){
+	var xmlBegin = data.lastIndexOf("<?xml");
+	var tagEnd = "</treedata>";
+	var xmlEnd = data.lastIndexOf(tagEnd);
+	$xml = null;
+	if (xmlBegin!=-1 && xmlEnd !=-1) {
+		var xmlLength = xmlEnd+tagEnd.length-xmlBegin;
+        var xml = data.substr(xmlBegin, xmlLength);
+        xmlDoc = $.parseXML(xml);
+        $xml = $(xmlDoc);
+    }
+
+    if (isGlossary) glossary = $xml;
+    else remarks = $xml
+
+    // now set 'tooltip' for each 'glos'
+    if ((isGlossary && glossary == null) || (!isGlossary && remarks == null)) {
+        if (isGlossary) console.log("Glossary file loading has failed");
+        else console.log("Remarks file loading has failed");
+        if (onError !== undefined) {
+        	onError(function () {
+	    		SetupTooltips(_url);    	
+	        });
+	    } else SetupTooltips(_url);
+    } else SetupTooltips(_url); 
+}
+
+function LoadFileWithTooltips(_url, _alternativeUrl, isGlossary) {
+    $.get(_url, function (data) {
+    		ExecuteXmlData(_url, data, function (onDone) {
+    			if (_alternativeUrl !== undefined) $.get(_alternativeUrl, function (data) {
+    				ExecuteXmlData(_alternativeUrl, data, function (onDone) { if (onDone !== undefined) onDone();}, isGlossary)
+    			});
+    			else if (onDone !== undefined) onDone();	
+    		}, isGlossary)
+    	})
+    	.fail(function() {
+	    	if (_alternativeUrl !== undefined) $.get(_alternativeUrl, function (data) {
+    			ExecuteXmlData(_alternativeUrl, data, function (onDone) { if (onDone !== undefined) onDone();}, isGlossary)
+    		});
+  		});
+}
+
+
+function LoadGlossary(_url, _alternativeUrl){
+	LoadFileWithTooltips(_url, _alternativeUrl, true)
+}
+
+function LoadRemarks(_url, _alternativeUrl){
+	LoadFileWithTooltips(_url, _alternativeUrl, false)
+}
+
+function SetupTooltips(_url) {
+	SetupTextFlowTooltips();
+	SetupEPUBTooltips(_url);
+}
+
+function addEPUBTooltip(elem, entry, _url, notfoundClass) {
+	if (entry == null || entry.length == 0) {
+		elem.toggleClass(notfoundClass);
+	} else {
+		elem.find("dfn, abbr").removeAttr("title");
+		var word = decodeHtmlEntity(unescape(entry.attr('word')));
+		var pathes = _url.split('/');
+		var path = "";
+		for (i = 0; i < pathes.length - 1; i++) path += pathes[i] + "/";
+		var def = RemovePageNumber(entry.attr('def')).replace(/\.\.\//g, path + "../")
+									.replace(/&(?!(?:apos|quot|[gl]t|amp);|#)/g, "&amp;"); // make valid xml by escaping &
+		try {
+			elem.append(
+				$("<aside>")
+				   .attr("class", "sb-reader-popup")
+		           //.attr("id", "glossarydesc_id")
+			       .css("left", "0px")
+			       .css("top", "25px")
+			       .append(
+		                $("<div>")
+		                   //.attr("id", "glossarydesc_word")
+			               .attr("class", "content-wrapper")
+			               .append(
+			               		$("<div>")
+			               			.attr("class", "contents")
+			               			.append(
+			               				$("<div>")
+					               			.attr("class", "snippet-content")
+					               			.append(
+					               				$("<h1>")
+													.css("display", word.length == 0 ? "none" : "")
+					               					.html(word)
+					               			)
+					               			.append(
+					               				$("<p>")
+													.attr("class", "text-content")
+					               					.html(def)
+					               			)
+			               			)
+			               	)
+			       )
+			);
+			elem.parents(".s9-scrollable").css("overflow", "visible");
+		} catch (err){
+			console.log("Error while creating EPUBTooltip: ", err)
+		}
+	}
+}
+
+
+function SetupEPUBTooltips(_url) {
+	if (!glossaryInitialized && glossary != null) {
+		glossaryInitialized = true;
+		$(".epub_glos").each( function () {
+			var entry_id = this.id.substr("glos_".length);
+			var entry = glossary == null || entry_id.length == 0 ? null : glossary.find('#' + entry_id).eq(0);
+			addEPUBTooltip($(this), entry, _url, "glosnotfound");
+		});
+	}
+	if (!remarksInitialized  && remarks != null) {
+		remarksInitialized = true;
+		$(".epub_footnote").each( function () {
+			var entry_id = this.id.substr("footnote_".length);
+			var entry = remarks == null || entry_id.length == 0 ? null : remarks.find('#' + entry_id).eq(0);
+			addEPUBTooltip($(this), entry, _url, "glosnotfound");
+		});
+	}
+
+	$(".epub_glos, .epub_footnote").hover(
+		function glosOnMouseOver() {
+			if (!$(this).hasClass("glosnotfound")) {
+				if (!isEbookMode)
+					disableQtip($(this));
+				if (!mobile) {
+					$(this).addClass("gloss_tooltip");
+					setupCurrentTooltip(this);
+				}
+			}
+		},
+		function glosOnMouseOut() {
+			if (!$(this).hasClass("glosnotfound")) {
+				if (!isEbookMode)
+					enableQtip($(this));
+				if (!mobile)
+					$(this).removeClass("gloss_tooltip");
+			}
+		}
+	);
+
+	$(window).click(hideVisibleGlossaryItem);
+}
+
+
+function SetupTextFlowTooltips() {
+	$(".glos").each( function () {
+		var entry_id = this.id.substr("glos_".length);
+		var entry = glossary == null || entry_id.length == 0 ? null : glossary.find('#' + entry_id).eq(0);
+		if (entry == null || entry.length == 0) {
+			$(this).toggleClass("glosnotfound");
+		} else {
+			$(this).find("dfn, abbr").removeAttr("title");
+			var word = decodeHtmlEntity(unescape(entry.attr('word')));
+			var def = RemovePageNumber(entry.attr('def'));
+			$(this).append(
+				$("<div>")
+				   .attr("class", "glossarydesc")
+		           //.attr("id", "glossarydesc_id")
+			       .css("font-weight", "normal")
+			       .css("background-color", "#dedede")
+			       .css("color", "black")
+			       .css("border", "1px solid #000")
+			       .css("width", "250px")
+			       .css("left", "0px")
+			       .css("top", "25px")
+			       .css("text-indent", "0")
+			       .css("font-size", "12pt")
+			       .css("word-wrap", "break-word")
+			       .append(
+		                $("<p>")
+		                   //.attr("id", "glossarydesc_word")
+			               .css("margin", "0")
+			               .css("padding", "2px 7px")
+			               .css("background-color", "rgb(173,216,230)")
+			               .css("font-weight", "bold")
+			               .html(word)
+			       )
+			       .append(
+		                $("<p>")
+		                   //.attr("id", "glossarydesc_def")
+			               .css("margin", "0")
+			               .css("padding", "2px 7px 7px")
+			               .css("background-color", "rgb(173,216,230)")
+			               .html(def)
+			       )
+			);
+		}
+	});
+
+	$(".footnote").each( function () {
+		var content = $(this).attr("footnotecontent");
+		if (content == null)
+			return false;
+		$(this).append(
+			$("<div class='footnotedesc'>")
+		       .css("font-weight", "normal")
+		       .css("background-color", "rgb(173,216,230)")
+		       .css("color", "black")
+		       .css("border", "1px solid #000")
+		       .css("width", "250px")
+		       .css("left", "0px")
+		       .css("top", "25px")
+		       .css("padding", "2px 7px 7px")
+		       .css("font-size", "12pt")
+		       .css("word-wrap", "break-word")
+		       .html(content)
+		);
+	} );
+
+	$(".glos, .footnote").hover(
+		function glosOnMouseOver() {
+			if (!$(this).hasClass("glosnotfound")) {
+				if (!isEbookMode)
+					disableQtip($(this));
+				if (!mobile) {
+					$(this).addClass("gloss_tooltip");
+					setupCurrentTooltip(this);
+				}
+			}
+		},
+		function glosOnMouseOut() {
+			if (!$(this).hasClass("glosnotfound")) {
+				if (!isEbookMode)
+					enableQtip($(this));
+				if (!mobile)
+					$(this).removeClass("gloss_tooltip");
+			}
+		}
+	);
+	
+	$(window).click(hideVisibleGlossaryItem);
+}
+
+function RemovePageNumber(text) {
+    if (text == null || text.trim() == '')
+        return '';
+        
+    var re = "(\\s+p\\.\\s+[0-9]+|\\s+\\(p\\.\\s+[0-9].+\\)|\\s+\\&lt;i\\&gt;p\\.\\s+[0-9].+)";
+    var reg = new RegExp(re, "ig");
+    
+    return text.replace(reg, "");
+}
+
+
+var visibleGlossaryItem = null;
+
+function hideVisibleGlossaryItem() {
+	if (!isEbookMode)
+		enableQtip($(this));
+	if (!visibleGlossaryItem) return;
+	$(visibleGlossaryItem).removeClass("gloss_tooltip");
+	visibleGlossaryItem = null;
+}
+
+function glossaryOnClick() {
+	if (!isEbookMode)
+		disableQtip($(this));
+	var dontShow = (visibleGlossaryItem == this || $(this).hasClass("glosnotfound"));
+	hideVisibleGlossaryItem();
+	if (dontShow) return;
+	$(this).addClass("gloss_tooltip");
+	setupCurrentTooltip(this);
+	visibleGlossaryItem = this;
+}
+
+function setupCurrentTooltip(elem) {
+	$(elem).children('.glossarydesc, .footnotedesc').find('*').css('color', 'black');
+	var sf = 1;
+	var sfz = 1;
+	if (isFirefox) sf = currentFontSize / 100;
+	else {
+		sf = parseFloat($('div.annotator-wrapper').css('zoom'));
+		if(isIE) sf /= 100;
+		sfz = sf;
+	};
+	$(elem).children('.glossarydesc, .footnotedesc, .sb-reader-popup').css("left", "0px");
+	var ecr = $(elem)[0].getBoundingClientRect();
+	var to = $(elem).children('.glossarydesc, .footnotedesc, .sb-reader-popup').offset();
+	var th = $(elem).height();
+	var ge = $(elem).children('.glossarydesc, .footnotedesc, .sb-reader-popup');
+	var gh = ge.height();
+	var gw = ge.width();
+	var ww = $(window).scrollLeft() + $(window).width();
+	if(to.left * sfz + gw * sf > ww - 30)
+		$(elem).children('.glossarydesc, .footnotedesc, .sb-reader-popup').css("left", (ww - 30 - (to.left * sfz + gw * sf)).toString() + "px");
+	// make sure that tooltip height is not greater than space on top
+	if(ecr.top * sfz - gh*sf >= 0)
+		$(elem).children('.glossarydesc, .footnotedesc, .sb-reader-popup').css("top", (-gh).toString() + "px");
+	else
+		$(elem).children('.glossarydesc, .footnotedesc, .sb-reader-popup').css("top", "25px");
+}
+
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// endregion Glossary
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// region Grayness and Highlight
+// this part is used by Smartbook only
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+var highlightsEnabled = true;
+HighlightModesEnum = {
+	NoHighlightMode : 0,
+	ReadingHighlightMode : 2,
+	SpreadHighlightMode : 3,
+	PracticeHighlightMode : 4,
+	RechargeHighlightMode : 5
+}
+var currentHighlightMode = HighlightModesEnum.NoHighlightMode;
+
+var loidList = [];
+var blackTextNodes = [];
+
+function findPNodeByName(node, names) {
+	while (node != null && names.indexOf(node.nodeName.toLowerCase()) < 0)
+		node = node.parentNode;
+	return node;
+}
+
+function traverseDom(node, checker, childrenFirst) {
+	if (!node) return false;
+	if (!childrenFirst && checker(node)) return true;
+	for (var i = 0; i < node.childNodes.length; ++i)
+		if (traverseDom(node.childNodes[i], checker, childrenFirst))
+			if (!childrenFirst) return true;
+	if (childrenFirst && checker(node)) return true;
+}
+
+function hasSubHighlight(node) {
+	var isHighlight = function(node) {
+		var attr = $(node).attr("highlight");
+		return attr && attr.indexOf("gray") == 0;
+	}
+	return traverseDom(node, isHighlight, false);
+}
+
+function hasSubParagraph(node) {
+	var isP = function(node) {
+		return node && node.nodeName && node.nodeName.toLowerCase() == "p";
+	}
+	return traverseDom(node, isP, false);
+}
+
+var loidOriginalColors = {};
+
+function saveLoidColors() {
+	$('[class^="loid_"]').each(function(idx, node) {
+		loidOriginalColors[node] = $(node).css("color");
+	});
+}
+
+function toggleGrays() {
+	$("[highlight^='gray']").each(function() {
+		tmp = $(this).css("color");
+		$(this).css("color", this.previousColor);
+		this.previousColor = tmp;
+	});
+}
+
+function setGray(node, isParent, init) {
+	if (node.nodeType != 3 && ((node.previousColor != null && node.previousColor !== undefined) || init)) {
+		if (init)
+			node.defaultColor = $(node).css("color");
+		
+		node.previousColor = $(node).css("color");
+
+		if (highlightsEnabled && !init)
+			$(node).css("color", "lightgrey");
+
+		node.previousOnclick = node.onclick;
+		$(node).attr("highlight", isParent ? "gray" : "gray-child");
+	}
+}
+
+function resetGray(node) {
+	if (node.previousColor != null) {
+		node.onclick = node.previousOnclick;
+		$(node).css("color", node.previousColor);
+		node.previousColor = null;
+	}
+}
+
+function setGrayForAllChildren(node, isParent, init) {
+	traverseDom(node, function(node) {
+		setGray(node, isParent, init);
+		isParent = false;
+	}, false);
+}
+
+var textNodes = [];
+function setPGray(init) {
+	saveLoidColors();
+
+	if (!isDimDisabled) {
+		if (textNodes.length == 0)
+			textNodes = getTextNodesIn(document.getElementsByClassName("annotator-wrapper")[0], false);
+		
+		for (var i = 0; i < textNodes.length; i++) {
+			setGray(textNodes[i], true, init);
+		}
+
+		$("li").each(function(i, elem) {
+			if ($(this).html().indexOf('highlight="gray"') != -1)
+				setGray(elem, true, init);
+		});
+
+		if (highlightsEnabled && init) {
+			$("[highlight^='gray']").css('color', 'lightgrey');
+		}
+	}
+}
+var significantNodes = [];
+function getTextNodesIn(node, includeWhitespaceNodes) {
+    var textN = [], excludeNodes = [], nonWhitespaceMatcher = /\S/;
+    var tmp = [];
+
+    function traverseHighlightedParagraph(node, pId, isLastChild) {
+    	var className = node.className !== undefined ? node.className : "";
+		if (className.indexOf("page-number") != -1)
+			textN.push(node);
+		else if (node.nodeType == 3 && nonWhitespaceMatcher.test(node.nodeValue) && significantNodes.indexOf(node) == -1) {
+			tmp.push(node);
+		} else if (className.indexOf("loid_") == -1) {
+			if (node.childNodes.length > 0)
+				for (var i = 0, len = node.childNodes.length; i < len; ++i) {
+					traverseHighlightedParagraph(node.childNodes[i], pId, false);
+				}
+		} else if (tmp.length > 0) {
+			significantNodes.push(tmp);
+			tmp = [];
+		}
+
+		if (isLastChild && tmp.length > 0) {
+			significantNodes.push(tmp);
+			tmp = [];
+		}
+	}
+
+    function traverseNonHighlightedParagraph(node) {
+		if (node.childNodes.length > 0)
+			for (var i = 0, len = node.childNodes.length; i < len; ++i) {
+				traverseNonHighlightedParagraph(node.childNodes[i]);
+			}
+
+    	if (node.nodeType == 3) {
+			var el = node.parentElement;
+			if (nonWhitespaceMatcher.test(node.nodeValue) && textN.indexOf(el) == -1 && el.tagName != "dfn" && el.className.indexOf("link-inline") == -1)
+				textN.push(el);
+		} else if (textN.indexOf(node) == -1) {
+			textN.push(node);
+		}
+    }
+
+    function getTextNodes(node) {
+    	if (node != null) {
+    		if (node.tagName == "p") {
+    			var containsHighlight = $(node).html().indexOf("loid_") != -1;
+    			if (containsHighlight) {
+    				if (node.childNodes.length > 0)
+						for (var i = 0, len = node.childNodes.length; i < len; ++i) {
+							traverseHighlightedParagraph(node.childNodes[i], node.id, i == len - 1);
+						}
+    			} else
+    				traverseNonHighlightedParagraph(node);
+    		} else if (node.nodeType == 3) {
+	            if (includeWhitespaceNodes || nonWhitespaceMatcher.test(node.nodeValue)) {
+	            	var el = node.parentElement;
+	            	if (textN.indexOf(el) == -1 && el.tagName != "dfn" && el.className.indexOf("link-inline") == -1)
+	                	textN.push(el);
+	            }
+	        } else if (node.className.indexOf("loid_") != -1) {
+	        	if (node.nextSibling != null && node.nextSibling.nodeType == 3) {
+	        		excludeNodes.push(node.parentNode);
+	        	}
+		    } else {
+	            for (var i = 0, len = node.childNodes.length; i < len; ++i) {
+					getTextNodes(node.childNodes[i]);
+				}
+			}
+	    }
+    }
+	getTextNodes(node);
+
+    excludeNodes.forEach(function(item) {
+    	var i = textN.indexOf(item);
+    	if (i != -1) 
+    		textN.splice(i, 1);
+    });
+
+    significantNodes = significantNodes.filter(function (v) {
+    	return !(v.length == 1 && v[0].nodeValue.length <= 2)
+    })
+
+    return textN;
+}
+
+function resetGrayForAllChildren(node){
+	traverseDom(node, resetGray, false);
+}
+
+function getScreenReaderElemHighlight(isBegin, color) {
+	return getScreenReaderElemWithLabel((isBegin ? "Start of" : "End of") + color + " highlighted text section");
+}
+
+function getScreenReaderElemBlack(isBegin) {
+	return getScreenReaderElemWithLabel((isBegin ? "Start of" : "End of") + " significant text section");
+}
+
+function getScreenReaderElemWithLabel(label) {
+	return $("<span>").attr("aria-label", label);
+}
+
+function setScreenReaderTags() {
+	function isFirstOrLast(first, elem, color) {
+		if (elem.hasClass("annotator-wrapper")) {
+			return true;
+		}
+
+		var siblingNode = first ? elem.get(0).previousSibling : elem.get(0).nextSibling
+		if (siblingNode != null && siblingNode.nodeType === 3) {
+			return true;
+		} else {
+			var el = first ? $(elem).prev() : $(elem).next();
+
+			if ($(el).length > 0) {
+				var highlight = $(el).attr("highlight");
+				if (highlight !== undefined) {
+					return highlight !== color;
+				} else if ($(el).find("span[class^='loid_']").length > 0) {
+					return false;
+				} else {
+					var parent = $(elem).parent();
+					return isFirstOrLast(first, parent, color);
+				}
+			} else {
+				var parent = $(elem).parent();
+				return isFirstOrLast(first, parent, color);
+			}
+		}
+	}
+
+	for (var i = loidList.length - 1; i >= 0; i--) {
+		var ns = $(".loid_" + loidList[i]);
+		var current = $(ns).first();
+		var color = current.attr("highlight");
+		if (isFirstOrLast(true, current, color))
+			current.prepend(getScreenReaderElemHighlight(true, color));
+
+		current = $(ns).last();
+		color = current.attr("highlight");
+		if (isFirstOrLast(false, current, color))
+			current.append(getScreenReaderElemHighlight(false, color));
+	}
+
+	for (var i =  significantNodes.length - 1; i >= 0; i--) {
+		var v = significantNodes[i];
+		if (v.length > 1) {
+			$(v[0]).wrap("<span class='significant'></span>").parent().prepend(getScreenReaderElemBlack(true));
+			$(v[v.length - 1]).wrap("<span class='significant'></span>").parent().append(getScreenReaderElemBlack(false));
+		} else {
+			$(v[0])
+				.wrap("<span class='significant'></span>")
+				.parent()
+				.prepend(getScreenReaderElemBlack(true))
+				.append(getScreenReaderElemBlack(false));
+		}
+	}
+
+	// Debug
+	// $("[aria-label='Start of significant text section']").css("color", "red").text("START");
+	// $("[aria-label='End of significant text section']").css("color", "blue").text("END");
+}
+
+function makeCustomHighlight(loid, color, color2, msg) {
+	console.log(msg, loid);
+	var ns = $(".loid_" + loid);
+	ns.css("background-color", color2);
+	ns.css("color", "black"); // use black color for all highlighted text (adaptive highlighting) to prevent ligth color and invisible text
+	ns.data("yellowhighlighted", color == "yellow" ? "yes" : "no");
+	for (var i = 0; i < ns.length; ++i) {
+		$(ns[i]).attr("highlight", color);
+	}
+}
+
+function makeYellowHighlight(loid) {
+	makeCustomHighlight(loid, "yellow", "rgba(255, 255, 136, 1)", "makeYellowHighlight");
+	if (loidList.indexOf(loid) == -1)
+		loidList.push(loid);
+}
+
+function makeGreenHighlight(loid) {
+	makeCustomHighlight(loid, "green", "rgba(144, 238, 144, 1)", "makeGreenHighlight");
+	if (loidList.indexOf(loid) == -1)
+		loidList.push(loid);
+}
+
+function makeUnhighlight(enable) {
+	highlightsEnabled = parseInt(enable) == 1;
+	if (highlightsEnabled) {
+		setPGray(true);
+	} else {
+		var yellow = $("[highlight='yellow']");
+		yellow.css("background-color", "").off(".highlight").qtip("destroy", true);
+		
+		var green = $("[highlight='green']");
+		green.css("background-color", "").off(".highlight").qtip("destroy", true);
+
+		$("[highlight^='gray']").each(function() {
+			$(this).css("color", this.defaultColor);
+		}).off(".highlight").qtip("destroy", true);
+	}
+}
+
+function addTextOnClickListener(enable) {
+	$("[highlight='yellow'],[highlight='green'],[highlight^='gray']").off(".highlight");
+	if (parseInt(enable) == 1) {
+		$("[highlight='yellow'],[highlight='green']").on("click.highlight", function() {
+			var opacity = $(this).css("background-color").replace(/^.*,(.+)\)/,'$1');
+			if (opacity < 1) {
+				$("[highlight='yellow']").css("background-color", "rgba(255, 255, 136, 1)");
+				$("[highlight='green']").css("background-color", "rgba(144, 238, 144, 1)");
+			} else {
+				$("[highlight='yellow']").css("background-color", "rgba(255, 255, 136, 0.3)");
+				$("[highlight='green']").css("background-color", "rgba(144, 238, 144, 0.3)");
+			}
+		});
+
+		if (!mobile)
+			$("[highlight='gray']").on("click.highlight", function(e) {
+				toggleGrays();
+				initTooltips(hiddenTooltips);
+				e.preventDefault();
+				e.stopPropagation();
+			});
+	}
+}
+
+function setHighlightsMode(value, isStatus) {
+	if(typeof(value) != 'string'){
+		value = "";
+	}
+
+	if(isStatus !== "false"){
+		highlightsEnabled = (parseInt(value) === 1);
+		setPGray(true);
+		initTooltips(hiddenTooltips);
+	} else {
+		var modeName = value.split('(')[0];
+		if(HighlightModesEnum[modeName] !== undefined) { // shouldn't it be changed to NoHighlight if invalid value was given?
+			currentHighlightMode = HighlightModesEnum[modeName];	
+		}
+	}
+}
+
+
+function getAllInSightLos(scroll) {
+	var result = [];
+	var bottomLimit = $('iframe').context.body.clientHeight + scroll;
+	$('[class^="loid_"]').each(function(idx, node) {
+		if (node.offsetTop >= scroll && node.offsetTop < bottomLimit) {
+			var loids = node.className.split("_");
+			loids.forEach(function (loid, i, array) {
+				if (i != 0 && result.indexOf(loid) == -1) result.push(loid);	
+			});
+		}
+	});
+	callflow_platform(['highlightShown'].concat(result));
+}
+
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// endregion Grayness and Highlight
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// region Helper functions
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+try { window.parent.dbg = window; } catch(e) {}
+
+function getUrlParameter(paramName) {
+    return  getParameterFromStr(paramName, window.location.href);
+}
+
+function getParameterFromStr(paramName, paramStr){
+	var result = "";
+    if (paramStr == null || paramStr == "") paramStr = window.location.href;
+    paramName = paramName.replace(/[\[]/, "\\\[").replace(/[\]]/, "\\\]");
+    var regexS = "[\\?&]" + paramName + "=([^&#]*)";
+    var regex = new RegExp(regexS);
+    var results = regex.exec(paramStr);
+    if (results == null)
+        return "";
+    else
+        return results[1];
+}
+
+function switchClass(tag, cl0, cl1, index) {
+	return $(tag).removeClass(index == 0? cl1 : cl0).addClass(index == 0? cl0 : cl1);
+}
+
+
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// endregion Helper functions
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// region Index
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+function hideAllIndexDiv(){
+	$(".glossConts").css("display", "none");  
+}
+
+function displayIndexDivById(id){
+	$("#"+id).css("display", "block");
+}
+
+function unSelectAllIndexHeaders(){
+	$("div .glossLet").removeClass('glossLetsel');
+}
+
+function selectIndexHeader(elem){
+	$(elem).addClass('glossLetsel');
+}
+
+
+function applyIndexSelection(elem){
+	unSelectAllIndexHeaders();
+	hideAllIndexDiv();
+	if ($(elem) !== undefined){
+		selectIndexHeader(elem);
+		if ($(elem).attr('id') !== undefined) {
+			var divId = "divContent" + $(elem).attr('id').replace('glossLet', '');
+			displayIndexDivById(divId);
+		}
+	}
+}
+
+
+function setupIndexElements() {
+	$("div .glossLet").click(function(){ 
+		applyIndexSelection(this);
+    });
+    applyIndexSelection($("div .glossLet").first());
+}
+
+
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// endregion Index
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+var toolbarH = 50;
+var isPreview = false;
+var defaultZoom = 0;
+var currentZoom = 0;
+
+var previewContent;
+var previewSelection;
+var preview;
+var viewer;
+var viewerContent;
+
+function setPreviewZoom(zoom, w, h) {
+	if (zoom <= defaultZoom) {
+		$(previewSelection).css("opacity", 0);
+	} else {
+		var scale = defaultZoom / zoom;
+		$(previewSelection).css({
+			opacity: 1,
+			width: w * scale,
+			height: h * scale
+		});
+
+		setPreviewPosition();
+	}
+}
+
+function setPreviewPosition() {
+	var previewOffset = $(previewContent).offset();
+	var previewTopOffset = $(preview).offset();
+	var viewerOffset = $(viewer).offset();
+	var viewerContentOffset = $(viewerContent).offset();
+
+	var ratio = $(previewContent).width() / $(viewerContent).width();
+
+	if (previewOffset !== undefined) {
+		var x = (previewOffset.left - previewTopOffset.left) - (viewerContentOffset.left - viewerOffset.left) * ratio - 5;
+		var y = (previewOffset.top - previewTopOffset.top) - (viewerContentOffset.top - viewerOffset.top) * ratio - 5;
+
+		$(previewSelection).css({
+			left: x,
+			top: y
+		});
+	}
+}
+
+function getLINPreview(url) {
+	var w = viewer.width() * 0.2;
+	var h = viewer.height() * 0.2;
+
+	previewContent = $('<img>')
+		.addClass("lin_preview_content")
+		.attr('src', url)
+		.css("max-width", w)
+		.css("max-height", h)
+		// .attr('style', 'max-width: ' + w + ' !important')
+		// .attr('style', 'max-height: ' + h + ' !important')
+		.one("load", function () {
+			var it = $(this);
+			it.css("top", Math.abs(it.height() / 2 - preview.height() / 2));
+			it.css("left", Math.abs(it.width() / 2 - preview.width() / 2));
+			it.css("opacity", 1);
+
+			setPreviewZoom(currentZoom, w, h);
+			setPreviewPosition();
+		});
+
+
+	previewSelection = $("<div>")
+		.addClass("lin_preview_selector")
+		.width(w)
+		.height(h);
+
+	preview = $("<div>")
+		.addClass("lin_preview")
+		.width(w)
+		.height(h)
+		.append(previewContent)
+		.append(previewSelection);
+
+	return preview;
+}
+
+function makeButton(id, fn) {
+	return $("<span>")
+		.attr("id", id)
+		.addClass("lin_control")
+		.click(function() {
+			if (fn)
+				fn($(this));
+		});
+}
+
+function getLINToolbar(url, top, width) {
+	var zoomIn = makeButton(
+		"lin_control_zoom_in",
+		function(el) {
+			$('#viewer').iviewer('zoom_by', 1)
+		}
+	);
+
+	var zoomOut = makeButton(
+		"lin_control_zoom_out",
+		function(el) {
+			$('#viewer').iviewer('zoom_by', -1)
+		}
+	);
+
+	var reset = makeButton(
+		"lin_control_zoom_reset",
+		function(el) {
+			$('#viewer').iviewer('set_zoom', defaultZoom);
+		}
+	);
+
+	var preview = makeButton(
+		"lin_control_preview",
+		function(el) {
+			isPreview = !isPreview;
+			if (isPreview) {
+				$("#viewer").append(getLINPreview(url));
+			} else {
+				$(".lin_preview").remove();
+			}
+		}
+	);
+
+	var close = $("<span>")
+		.attr("id", "lin_control_close")
+		.addClass("lin_control")
+		.addClass("close_btn")
+		.text("Close")
+		.click(function() {
+			$(".lin_window").remove();
+			$("body").removeClass("lin_body");
+		});
+
+	var line = $("<hr>").addClass("line");
+
+	var toolbar = $("<div>")
+		.addClass("lin_toolbar")
+		.height(toolbarH)
+		.width(width - 20)
+		.css("top", top)
+		.append(line)
+		.append(reset)
+		.append(zoomIn)
+		.append(zoomOut)
+		.append(preview)
+		.append(close);
+
+	return toolbar;
+}
+
+function getTop(h, dialogH) {
+	return h / 2 - dialogH / 2 - 20;
+}
+
+function getLeft(w, dialogW) {
+	return w / 2 - dialogW / 2;
+}
+
+function getCorrectHeight() {
+	// return (window.outerHeight - 100)/ window.devicePixelRatio;
+	return $(window).height();
+}
+
+function getCorrectWidth() {
+	// return window.outerWidth / window.devicePixelRatio;
+	return $(window).width();
+}
+
+function largeImageNavigator(url) {
+	console.log("largeImageNavigator ready");
+
+	var w = getCorrectWidth();
+	var h = getCorrectHeight();
+
+	var containerW = w * 0.8;
+	var containerH = h * 0.9;
+
+	viewer = $("<div>")
+		.attr("id", "viewer")
+		.height(containerH - toolbarH)
+		.width(containerW)
+		.css("overflow", "hidden")
+		.css("position", "fixed")
+		.css("opacity", 0);
+
+	var top = getTop(h, containerH);
+	var left = getLeft(w, containerW);
+	
+	var container = $("<div>")
+		.attr("id", "lin_dialog")
+		.width(containerW)
+		.height(containerH)
+		.css("top", top)
+		.css("left", left)
+		.css("background", "white")
+		.css("position", "fixed")
+		.css("overflow", "hidden")
+		.append(viewer)
+		.append(getLINToolbar(url, top + containerH - toolbarH, containerW));
+
+	var win = $("<div>")
+		.addClass("lin_window")
+		.append(container);
+
+	$("body")
+		.addClass("lin_body")
+		.append(win);
+
+	viewer.iviewer({
+		src: url,
+		ui_disabled: true,
+		update_on_resize: false,
+        zoom_delta: 1.2
+	});
+
+	defaultZoom = viewer.iviewer("info", "zoom", false);
+	viewerContent = viewer[0].children[0];
+	$(viewerContent).addClass("lin_ignore_global");
+
+	viewer.bind('ivieweronafterzoom', function(ev, value) {
+		if (defaultZoom == "fit") {
+			defaultZoom = value;
+		}
+
+		currentZoom = value;
+
+		if (isPreview) {
+			var _w = viewer.width() * 0.2;
+			var _h = viewer.height() * 0.2;
+			setPreviewZoom(value, _w, _h);
+		}
+	});
+
+	viewer.bind('iviewerondrag', function(ev, value) {
+		if (isPreview) {
+			setPreviewPosition();
+		}
+	});
+
+	viewer.bind('ivieweronfinishload', function(ev, value) {
+		viewer.css("opacity", 1);
+	});
+
+	$(window).resize(function() {
+		var _w = getCorrectWidth();
+		var _h = getCorrectHeight();
+
+		var dialog = $("#lin_dialog");
+
+		dialog
+			.css("top", getTop(_h, dialog.height()))
+			.css("left", getLeft(_w, dialog.width()))
+	});
+}
+
+// $(function() {
+//     console.log("largeImageNavigator ready");
+// });///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// region Link Interceptor
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+function interceptAllLinksInDocument(divId) {
+	if (divId == null || divId == "") 
+		$("a").click(function() {
+        	//interceptLink(this.href, window.location.href); return false;
+        	interceptAllLinks();
+    	}); 
+	else 
+		$("#" + divId).find("a").click(function(){ 
+			//interceptLink(this.href, window.location.href); return false;
+			interceptAllLinks();
+		});
+}
+
+function interceptAllLinks() {
+	$("a").click(function() {
+		if ($(this).hasClass("dont_intercept"))
+			return;
+		
+		if ($(this).hasClass("footnote")) {
+			$(this).removeAttr("href");
+		}
+
+		if (typeof $(this).attr("onclick") !== "undefined" && $(this).attr("onclick") != "" )
+			return;
+		
+		var href = this.getAttribute("href");
+		if ($(this).hasClass("glos") || $(this).hasClass("footnote") || $(this).hasClass("epub_glos") || $(this).hasClass("epub_footnote") || $(this).hasClass("glosnotfound")) {
+			glossaryOnClick.bind(this)();
+			return false;
+		} else if ((href.indexOf("#data-uuid") != -1) && (href.indexOf("/") == -1)) {
+			var h = $(href);
+			if (h.length) {
+				var top = h.offset().top;
+				DoScroll(top);
+			};
+			interceptLink(this.href, window.location.href, GetFirstVisibleElementID());
+			return false;
+		} else if ($("[data-uuid*='" + href + "']").length > 0) {
+			// if same page
+			var top = $("[data-uuid*='" + href + "']").offset().top;
+			DoScroll(top);
+			interceptLink(this.href, window.location.href, GetFirstVisibleElementID());
+			return false;
+		} else if (this.id != "annotator_highlight" && this.id != "annotator_stickie") {
+			interceptLink(this.href, window.location.href, GetFirstVisibleElementID());
+			return false;
+		}
+	});
+}
+
+function interceptLink(link, prefix, scrollId) {
+    console.log("interceptLink " + String(link));
+    callflow_platform(["interceptLink", String(link), String(prefix), String(scrollId)]);   
+} 
+
+function executeLink(link) {
+    console.log("executeLink");
+    window.location.href = link;
+}
+
+function initBackButton() {
+	var containerTop = window.innerHeight - 40;
+	var container = $("<div>").addClass("backbuttonhelper").attr("id", "backbuttonhelper").css("top", containerTop + "px");
+
+	$("body").append(container);
+	
+	var btnLeft = container.width() / 2 - 75;
+	var btn = $("<a>").attr("id", "back_button").addClass("backbutton").attr("tabIndex", "0").css("left", btnLeft + "px").html("Go back");
+	// href is working for both click event and Enter,  $.click didn't work for Enter
+	btn[0].href = "javascript: callflow_platform(['goToHistory']);";
+
+	container.append(btn);
+	// since iframe tries to ensure focus on itself, it's necessary to do same delayed focus
+	ensureFocus(btn[0]);
+}
+
+function removeBackButton() {
+	$("#backbuttonhelper").remove();
+}
+
+function openLink(link) {
+	// check if we have full link
+	if (link.indexOf("http") == 0) {
+		interceptLink(link, window.location.href, -1);
+	} else {
+		if (getFileExtension(link) == "pdf")
+			window.open(link, '_blank');
+		else {
+			var trimParams = window.location.href.split("?")[0];
+			var urlPrefix = trimParams.slice(0, trimParams.lastIndexOf("/") + 1);
+			interceptLink(urlPrefix + link, window.location.href, -1);
+		}
+	}
+}
+
+function backButtonExist() {
+	return $("#backbuttonhelper").length > 0;
+}
+
+function updateBackButtonPosition() {
+	var containerTop = window.innerHeight - 40;
+	$("#backbuttonhelper").css("top", containerTop + "px");
+	var btnLeft = $("#backbuttonhelper").width() / 2 - 75;
+	$("#back_button").css("left", btnLeft + "px")
+}
+
+function getFileExtension(link) {
+	var file = link.split("/").pop();
+	var extension = file.split(".").pop();
+	return extension.toLowerCase();
+}
+
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// endregion Link Interceptor
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// region LR overlays
+// this part is used by Smartbook only
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+var lrs = [];
+var lrsAdded = [];
+
+var isButtonLoaded = false;
+var lrButtonHtml = [];
+var lrButtonIds = [];
+
+function setupLrOverlays(_loId, _lrId, _lrType, _status, _color) {
+	if (lrsAdded.indexOf(_lrId) == -1 && !isButtonLoaded) {
+		var lr = {
+			lrId:_lrId,
+			lrType:_lrType,
+			loId: _loId,
+			status: _status,
+			color: _color
+		}
+
+		lrs.push(lr);
+		lrsAdded.push(lr.lrId);
+	};
+	console.log("setupLrOverlays");
+}
+
+function lrWindowOnResize() {
+	var currBodyWidth = $('body').width();
+	if (bodyWidthBehaviourValue == 0 ) {
+		if (mobile) {
+			$('body').width(window.innerWidth * (currentFontSize / 100.0) - 135);
+			lrButtonPos = (window.innerWidth * (currentFontSize / 100.0) - 110);
+		}
+		else {
+			$('body').width(window.innerWidth * (currentFontSize / 100.0) - 145);
+			lrButtonPos = (window.innerWidth * (currentFontSize / 100.0) - 110);
+		}
+	} else {
+		lrButtonPos = (window.innerWidth * (currentFontSize / 100.0) / 2) + (currBodyWidth / 2) + 30;
+	}
+	
+	for(i = 0; i < lrButtonHtml.length; i++) {
+		lrButtonHtml[i].css("left", String(lrButtonPos) + "px");
+	}
+	overlaysTopUpdate();
+}
+
+function overlaysTopUpdate() {
+	for (i = 0; i < lrButtonHtml.length; i++) {
+		var loPos = $(".loid_" + lrButtonIds[i]).offset();
+		lrButtonHtml[i].css("top", String(loPos.top - 40) + "px")
+	}
+}
+
+function showOverlaysButtonHtml() {
+	var currBodyWidth = $('body').width();
+
+	if (!isButtonLoaded) {
+		for(var i = 0; i < lrs.length; i++) {
+			lr = lrs[i];
+			if (lr != null) {
+				var loPos = $(".loid_" + lr.loId).offset();
+
+				var los = [];
+				los[los.length] = lr.loId;
+				lrButtonIds[lrButtonIds.length] = lr.loId;
+
+				for(var j = i + 1; j < lrs.length; j++) {
+					lrNext = lrs[j];
+					if (lrNext != null) {
+						var loTempPos = $(".loid_" + lrNext.loId).offset();
+						if (Math.abs(loTempPos.top - loPos.top) < 100) {
+							los.push(lrNext.loId);
+						}
+					}
+				};
+
+				if (bodyWidthBehaviourValue == 0 ) {
+					lrButtonPos = (window.innerWidth - 220);
+				} else {
+					lrButtonPos = (window.innerWidth / 2) + (currBodyWidth / 2) + 30;
+				}
+
+				var lrButton = $("<div>");
+				lrButton.append(lrButtonList(los));
+				lrButton.css("position", "absolute");
+				lrButton.css("top", String(loPos.top - 40) + "px");
+				lrButton.css("left", String(lrButtonPos) + "px");
+				lrButtonHtml[lrButtonHtml.length] = lrButton;
+				$('body').append(lrButton);
+			}
+		}
+
+		$(".lrOverlays span.drop-down img").css("max-width", "59px");
+		lrOverlays_setupClicks();
+		isButtonLoaded = true;
+	} else {
+		return;
+	};
+}
+
+function lrOverlays_setupClicks() {
+	function hideallDropdowns() {
+		$('.dropped .drop-menu-main-sub').hide();
+		$('.dropped').removeClass('dropped');
+		$('.dropped .drop-menu-main-sub .title').unbind('click');
+	}
+	function showDropdown() {
+		var el_li = $(this).parent().addClass('dropped');
+		el_li
+			.find('.title')
+			.click(hideallDropdowns)
+			.html($(this).html());
+		el_li.find('.drop-menu-main-sub').show();
+	}
+	$('.drop-down').click(showDropdown);
+	$(document).mouseup(hideallDropdowns);
+}
+
+function overlayButtonHtml(loIds) {
+	var li = $("<li>").append(lrButtonList(loIds));
+
+	var ul = $("<ul>")
+		.addClass("drop-menu-main")
+		.attr("id", "button_" + loIds[0])
+		.append(li);
+
+	var div = $("<div>")
+		.addClass("lrOverlays")
+		.append(ul);
+
+	return div
+}
+
+function highlightLo(loId, color, isOver) {
+	var ns = $(".loid_" + loId);
+	if(isOver) {
+		ns.css("background-color", "#6294da");
+	} else {
+		ns.css("background-color", color);
+	};
+}
+
+function lrButtonList(loIds) {
+	checkedLos = 0;
+	var imgs = [];
+
+	for(var p = 0; p < loIds.length; p++) {
+		for(var i = 0; i < lrs.length; i++) {
+			var lr = lrs[i];
+			if (lr != null && lr.loId == loIds[p] ) {
+				var img = $("<img>")
+					.attr("id", lr.loId)
+					.attr("data-lr-color", lr.color)
+					.attr("data-lr-id", lr.lrId)
+					.attr("src", fixScheme(sbScriptLocation + "images/lroverlay/" + lr.lrType + lr.status + ".png"))
+					.width(70)
+					.height(60)
+					.css("border", "9px solid white")
+					.css("cursor", "pointer")
+					.css("box-sizing", "inherit")
+					.click(function() { callflow_platform(["openLr", String($(this).attr("data-lr-id"))]); })
+					.mouseenter(function() { highlightLo($(this).attr("id"), $(this).attr("data-lr-color"), true); })
+					.mouseleave(function() { highlightLo($(this).attr("id"), $(this).attr("data-lr-color"), false); });
+
+				if (lr.status == "_checked")
+					checkedLos++;
+
+				imgs.push(img);
+				lrs[i] = null;
+			}
+		}
+	}
+
+
+	var img = $("<img>")
+		.attr("src", checkedLos == loIds.length ? fixScheme(sbScriptLocation + "images/lroverlay/LO_checked.png") : fixScheme(sbScriptLocation + "images/lroverlay/LO.png"))
+		.attr("alt", "javascript button")
+		.width(59)
+		.height(50);
+	var span = $("<span>")
+		.addClass("drop-down")
+		.append(img);
+
+
+	var spanTitle = $("<span>")
+		.addClass("title");	
+	var divInner = $("<div>")
+		.addClass("drop-menu-main-sub")
+		.append(spanTitle);
+	for (var i = 0; i < imgs.length; i++) {
+		divInner.append(imgs[i]);
+	};
+
+
+	var li = $("<li>")
+		.append(span)
+		.append(divInner);
+	var ul = $("<ul>")
+		.addClass("drop-menu-main")
+		.attr("id", "button_" + loIds[0])
+		.append(li);
+	var divTop = $("<div>")
+		.addClass("lrOverlays")
+		.append(ul);
+
+	return divTop;
+}
+
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// endregion LR overlays
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+/*
+ * jQuery MD5 Plugin 1.2.1
+ * https://github.com/blueimp/jQuery-MD5
+ *
+ * Copyright 2010, Sebastian Tschan
+ * https://blueimp.net
+ *
+ * Licensed under the MIT license:
+ * http://creativecommons.org/licenses/MIT/
+ * 
+ * Based on
+ * A JavaScript implementation of the RSA Data Security, Inc. MD5 Message
+ * Digest Algorithm, as defined in RFC 1321.
+ * Version 2.2 Copyright (C) Paul Johnston 1999 - 2009
+ * Other contributors: Greg Holt, Andrew Kepert, Ydnar, Lostinet
+ * Distributed under the BSD License
+ * See http://pajhome.org.uk/crypt/md5 for more info.
+ */
+
+/*jslint bitwise: true */
+/*global unescape, jQuery */
+
+(function ($) {
+    'use strict';
+
+    /*
+    * Add integers, wrapping at 2^32. This uses 16-bit operations internally
+    * to work around bugs in some JS interpreters.
+    */
+    function safe_add(x, y) {
+        var lsw = (x & 0xFFFF) + (y & 0xFFFF),
+            msw = (x >> 16) + (y >> 16) + (lsw >> 16);
+        return (msw << 16) | (lsw & 0xFFFF);
+    }
+
+    /*
+    * Bitwise rotate a 32-bit number to the left.
+    */
+    function bit_rol(num, cnt) {
+        return (num << cnt) | (num >>> (32 - cnt));
+    }
+
+    /*
+    * These functions implement the four basic operations the algorithm uses.
+    */
+    function md5_cmn(q, a, b, x, s, t) {
+        return safe_add(bit_rol(safe_add(safe_add(a, q), safe_add(x, t)), s), b);
+    }
+    function md5_ff(a, b, c, d, x, s, t) {
+        return md5_cmn((b & c) | ((~b) & d), a, b, x, s, t);
+    }
+    function md5_gg(a, b, c, d, x, s, t) {
+        return md5_cmn((b & d) | (c & (~d)), a, b, x, s, t);
+    }
+    function md5_hh(a, b, c, d, x, s, t) {
+        return md5_cmn(b ^ c ^ d, a, b, x, s, t);
+    }
+    function md5_ii(a, b, c, d, x, s, t) {
+        return md5_cmn(c ^ (b | (~d)), a, b, x, s, t);
+    }
+
+    /*
+    * Calculate the MD5 of an array of little-endian words, and a bit length.
+    */
+    function binl_md5(x, len) {
+        /* append padding */
+        x[len >> 5] |= 0x80 << ((len) % 32);
+        x[(((len + 64) >>> 9) << 4) + 14] = len;
+
+        var i, olda, oldb, oldc, oldd,
+            a =  1732584193,
+            b = -271733879,
+            c = -1732584194,
+            d =  271733878;
+
+        for (i = 0; i < x.length; i += 16) {
+            olda = a;
+            oldb = b;
+            oldc = c;
+            oldd = d;
+
+            a = md5_ff(a, b, c, d, x[i],       7, -680876936);
+            d = md5_ff(d, a, b, c, x[i +  1], 12, -389564586);
+            c = md5_ff(c, d, a, b, x[i +  2], 17,  606105819);
+            b = md5_ff(b, c, d, a, x[i +  3], 22, -1044525330);
+            a = md5_ff(a, b, c, d, x[i +  4],  7, -176418897);
+            d = md5_ff(d, a, b, c, x[i +  5], 12,  1200080426);
+            c = md5_ff(c, d, a, b, x[i +  6], 17, -1473231341);
+            b = md5_ff(b, c, d, a, x[i +  7], 22, -45705983);
+            a = md5_ff(a, b, c, d, x[i +  8],  7,  1770035416);
+            d = md5_ff(d, a, b, c, x[i +  9], 12, -1958414417);
+            c = md5_ff(c, d, a, b, x[i + 10], 17, -42063);
+            b = md5_ff(b, c, d, a, x[i + 11], 22, -1990404162);
+            a = md5_ff(a, b, c, d, x[i + 12],  7,  1804603682);
+            d = md5_ff(d, a, b, c, x[i + 13], 12, -40341101);
+            c = md5_ff(c, d, a, b, x[i + 14], 17, -1502002290);
+            b = md5_ff(b, c, d, a, x[i + 15], 22,  1236535329);
+
+            a = md5_gg(a, b, c, d, x[i +  1],  5, -165796510);
+            d = md5_gg(d, a, b, c, x[i +  6],  9, -1069501632);
+            c = md5_gg(c, d, a, b, x[i + 11], 14,  643717713);
+            b = md5_gg(b, c, d, a, x[i],      20, -373897302);
+            a = md5_gg(a, b, c, d, x[i +  5],  5, -701558691);
+            d = md5_gg(d, a, b, c, x[i + 10],  9,  38016083);
+            c = md5_gg(c, d, a, b, x[i + 15], 14, -660478335);
+            b = md5_gg(b, c, d, a, x[i +  4], 20, -405537848);
+            a = md5_gg(a, b, c, d, x[i +  9],  5,  568446438);
+            d = md5_gg(d, a, b, c, x[i + 14],  9, -1019803690);
+            c = md5_gg(c, d, a, b, x[i +  3], 14, -187363961);
+            b = md5_gg(b, c, d, a, x[i +  8], 20,  1163531501);
+            a = md5_gg(a, b, c, d, x[i + 13],  5, -1444681467);
+            d = md5_gg(d, a, b, c, x[i +  2],  9, -51403784);
+            c = md5_gg(c, d, a, b, x[i +  7], 14,  1735328473);
+            b = md5_gg(b, c, d, a, x[i + 12], 20, -1926607734);
+
+            a = md5_hh(a, b, c, d, x[i +  5],  4, -378558);
+            d = md5_hh(d, a, b, c, x[i +  8], 11, -2022574463);
+            c = md5_hh(c, d, a, b, x[i + 11], 16,  1839030562);
+            b = md5_hh(b, c, d, a, x[i + 14], 23, -35309556);
+            a = md5_hh(a, b, c, d, x[i +  1],  4, -1530992060);
+            d = md5_hh(d, a, b, c, x[i +  4], 11,  1272893353);
+            c = md5_hh(c, d, a, b, x[i +  7], 16, -155497632);
+            b = md5_hh(b, c, d, a, x[i + 10], 23, -1094730640);
+            a = md5_hh(a, b, c, d, x[i + 13],  4,  681279174);
+            d = md5_hh(d, a, b, c, x[i],      11, -358537222);
+            c = md5_hh(c, d, a, b, x[i +  3], 16, -722521979);
+            b = md5_hh(b, c, d, a, x[i +  6], 23,  76029189);
+            a = md5_hh(a, b, c, d, x[i +  9],  4, -640364487);
+            d = md5_hh(d, a, b, c, x[i + 12], 11, -421815835);
+            c = md5_hh(c, d, a, b, x[i + 15], 16,  530742520);
+            b = md5_hh(b, c, d, a, x[i +  2], 23, -995338651);
+
+            a = md5_ii(a, b, c, d, x[i],       6, -198630844);
+            d = md5_ii(d, a, b, c, x[i +  7], 10,  1126891415);
+            c = md5_ii(c, d, a, b, x[i + 14], 15, -1416354905);
+            b = md5_ii(b, c, d, a, x[i +  5], 21, -57434055);
+            a = md5_ii(a, b, c, d, x[i + 12],  6,  1700485571);
+            d = md5_ii(d, a, b, c, x[i +  3], 10, -1894986606);
+            c = md5_ii(c, d, a, b, x[i + 10], 15, -1051523);
+            b = md5_ii(b, c, d, a, x[i +  1], 21, -2054922799);
+            a = md5_ii(a, b, c, d, x[i +  8],  6,  1873313359);
+            d = md5_ii(d, a, b, c, x[i + 15], 10, -30611744);
+            c = md5_ii(c, d, a, b, x[i +  6], 15, -1560198380);
+            b = md5_ii(b, c, d, a, x[i + 13], 21,  1309151649);
+            a = md5_ii(a, b, c, d, x[i +  4],  6, -145523070);
+            d = md5_ii(d, a, b, c, x[i + 11], 10, -1120210379);
+            c = md5_ii(c, d, a, b, x[i +  2], 15,  718787259);
+            b = md5_ii(b, c, d, a, x[i +  9], 21, -343485551);
+
+            a = safe_add(a, olda);
+            b = safe_add(b, oldb);
+            c = safe_add(c, oldc);
+            d = safe_add(d, oldd);
+        }
+        return [a, b, c, d];
+    }
+
+    /*
+    * Convert an array of little-endian words to a string
+    */
+    function binl2rstr(input) {
+        var i,
+            output = '';
+        for (i = 0; i < input.length * 32; i += 8) {
+            output += String.fromCharCode((input[i >> 5] >>> (i % 32)) & 0xFF);
+        }
+        return output;
+    }
+
+    /*
+    * Convert a raw string to an array of little-endian words
+    * Characters >255 have their high-byte silently ignored.
+    */
+    function rstr2binl(input) {
+        var i,
+            output = [];
+        output[(input.length >> 2) - 1] = undefined;
+        for (i = 0; i < output.length; i += 1) {
+            output[i] = 0;
+        }
+        for (i = 0; i < input.length * 8; i += 8) {
+            output[i >> 5] |= (input.charCodeAt(i / 8) & 0xFF) << (i % 32);
+        }
+        return output;
+    }
+
+    /*
+    * Calculate the MD5 of a raw string
+    */
+    function rstr_md5(s) {
+        return binl2rstr(binl_md5(rstr2binl(s), s.length * 8));
+    }
+
+    /*
+    * Calculate the HMAC-MD5, of a key and some data (raw strings)
+    */
+    function rstr_hmac_md5(key, data) {
+        var i,
+            bkey = rstr2binl(key),
+            ipad = [],
+            opad = [],
+            hash;
+        ipad[15] = opad[15] = undefined;                        
+        if (bkey.length > 16) {
+            bkey = binl_md5(bkey, key.length * 8);
+        }
+        for (i = 0; i < 16; i += 1) {
+            ipad[i] = bkey[i] ^ 0x36363636;
+            opad[i] = bkey[i] ^ 0x5C5C5C5C;
+        }
+        hash = binl_md5(ipad.concat(rstr2binl(data)), 512 + data.length * 8);
+        return binl2rstr(binl_md5(opad.concat(hash), 512 + 128));
+    }
+
+    /*
+    * Convert a raw string to a hex string
+    */
+    function rstr2hex(input) {
+        var hex_tab = '0123456789abcdef',
+            output = '',
+            x,
+            i;
+        for (i = 0; i < input.length; i += 1) {
+            x = input.charCodeAt(i);
+            output += hex_tab.charAt((x >>> 4) & 0x0F) +
+                hex_tab.charAt(x & 0x0F);
+        }
+        return output;
+    }
+
+    /*
+    * Encode a string as utf-8
+    */
+    function str2rstr_utf8(input) {
+        return unescape(encodeURIComponent(input));
+    }
+
+    /*
+    * Take string arguments and return either raw or hex encoded strings
+    */
+    function raw_md5(s) {
+        return rstr_md5(str2rstr_utf8(s));
+    }
+    function hex_md5(s) {
+        return rstr2hex(raw_md5(s));
+    }
+    function raw_hmac_md5(k, d) {
+        return rstr_hmac_md5(str2rstr_utf8(k), str2rstr_utf8(d));
+    }
+    function hex_hmac_md5(k, d) {
+        return rstr2hex(raw_hmac_md5(k, d));
+    }
+    
+    $.md5 = function (string, key, raw) {
+        if (!key) {
+            if (!raw) {
+                return hex_md5(string);
+            } else {
+                return raw_md5(string);
+            }
+        }
+        if (!raw) {
+            return hex_hmac_md5(key, string);
+        } else {
+            return raw_hmac_md5(key, string);
+        }
+    };
+    
+}(typeof jQuery === 'function' ? jQuery : this));///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// region Media 
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+
+function modifyInnerImage(elem) {
+	$(elem).children('img').each(function () {
+		var onclickFn = $(this).attr("onClick") + "";
+		if (onclickFn != "undefined") {
+			if (onclickFn.indexOf("CurSectionRaw") > -1){
+				modifyImgOnClick(this, onclickFn);
+			} 
+		} else {
+			var theLink = "LoadMedia('figure,'+CurSectionRaw+'');";
+			modifyImgOnClick(this, theLink);
+		}
+	});
+
+}
+
+function modifyImgOnClick(elem, link){
+	var theSrc = elem.src + "";
+
+	theSrc = theSrc.replace(".jpg", "_lg.jpg");
+	theSrc = theSrc.replace(".png", "_lg.png");
+
+	var theLink = link.replace("'+CurSectionRaw+'", theSrc);
+	elem.setAttribute("onClick", theLink);
+	elem.setAttribute("align", "center");
+	elem.setAttribute("style", "cursor:pointer");
+
+}
+
+function modifyAllImageTags(){
+	var imageNumber = 0;
+	var documentHTML = "";
+	
+	documentHTML = $('body').html() + "";
+	var imgs = document.images;
+	
+	$(".graphic").each(function () {modifyInnerImage(this);});
+	$(".figure").each(function () {modifyInnerImage(this);});
+
+}
+
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// endregion Media
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/////////////////////////////////////////////////
+/// region sb_media_player.js
+/////////////////////////////////////////////////
+
+function LoadMedia(param) {
+	InitMedia(param, false)
+}
+
+function myClickAudio(param) {
+	InitMedia(param, true);
+}
+
+function InitMedia(param, isAudio) {
+	if (isAudio)
+		customPopup("assets/symlink/" + param, "audio");
+	else {
+		medout = param.split(",");
+		var type = medout[0].toLowerCase();
+		var source = medout[1];
+		var width = medout[2];
+		var height = medout[3];
+
+		if (type == "viddler") {
+			customPopup("https://www.viddler.com/embed/" + source, "page", 0, 0, param);
+		} else if (type == "swf" || type == "dcr") {
+			url = source.indexOf("http") === 0 || source.indexOf("https") === 0 ? source : "assets/symlink/" + source;
+			customPopup(url, "flash", width, height, param);
+		} else if (type == "mov" || type == "mp4") {
+			customPopup("assets/symlink/" + source, "video", 0, 0, param);
+		} else if ((type == "figure") || (type == "graphic")) {
+			customPopup(source, "figure", width, height, param);
+		} else if (type == "html") {
+			url = source.indexOf("http") === 0 || source.indexOf("https") === 0 ? source : "assets/symlink/" + source;
+			customPopup(url, "page", width, height, param);
+		}
+	}
+}
+
+function createPopupPlaceholder() {
+	var createBanSvg = function(cr) {
+		var stroke = 3.0, 
+			cx = cr + stroke, 
+			cy = cr + stroke;
+
+		var svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+		setAttributes(svg, {
+			height: cr*2.0 + 2.0*stroke,
+			width:  cr*2.0 + 2.0*stroke
+		});
+		var g = document.createElementNS("http://www.w3.org/2000/svg", "g");
+		assignStyle(g, {
+			fillOpacity: 0.0,
+			strokeWidth: stroke,
+			stroke: "gray"
+		});
+		svg.appendChild(g);
+
+		var circle = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+		setAttributes(circle, {
+			cx: cx,
+			cy: cy,
+			r:  cr
+		});
+		g.appendChild(circle);
+
+		var line = document.createElementNS("http://www.w3.org/2000/svg", "line");
+		var rProjection = cr*Math.SQRT2/2;
+		setAttributes(line, {
+			x1: cx - rProjection,
+			x2: cx + rProjection,
+			y1: cy - rProjection,
+			y2: cy + rProjection
+		});
+		g.appendChild(line);
+
+		return svg;
+	};
+
+	var placeholder = document.createElement('div');
+	assignStyle(placeholder, {
+		left: '0px',
+		right: '0px',
+		top: '0px',
+		bottom: '0px',
+		margin: 'auto'
+	});
+	var _img = createBanSvg(12);
+	assignStyle(_img, {
+		margin: "15px",
+		verticalAlign: "middle"
+	});
+	placeholder.appendChild(_img);
+
+	var _text = document.createElement('span');
+	assignStyle(_text, {
+		verticalAlign: "middle"
+	})
+	placeholder.appendChild(_text);
+	placeholder.setLoadingState = function() {
+		_text.innerHTML = "Loading content...";
+		assignStyle(_img, {display: 'none'})
+	}
+	placeholder.setErrorState = function() {
+		_text.innerHTML = "Can not load this resource.";
+		assignStyle(_img, {display: ''})
+	}
+	placeholder.setOfflineState = function() {
+		_text.innerHTML = "To see this content, you must be online.";
+		assignStyle(_img, {display: ''})
+	}
+	placeholder.setLoadedState = function(){
+		assignStyle(placeholder, { display: 'none' });
+	}
+
+	placeholder.setLoadingState();
+	return placeholder;
+
+}
+
+
+function customPopup(url, type, w, h, param) {
+	var player = $("#mediaplayercont");
+	if (player) {
+		player.remove();
+	}
+
+	if(typeof(w) !== 'number' || typeof(h) !== 'number'){
+		w = w != 'undefined'? parseInt(w) : 0;
+		h = h != 'undefined'? parseInt(h) : 0;
+	}
+
+	var vPopup = document.createElement('div');
+	vPopup.setAttribute("id", "videoplayercont")
+	document.body.appendChild(vPopup);
+	assignStyle(vPopup, {
+		position:'fixed',
+		width:'100%',
+		height:'100%',
+		left:'0px',
+		top:'0px'
+	});
+
+	var blockClose = document.createElement('div');
+	assignStyle(blockClose, {
+		position:'absolute',
+		width:'100%',
+		height:'100%',
+		backgroundColor:"rgba(0,0,0,0.5)"
+	});
+	blockClose.onclick = function() {
+		this.parentNode.parentNode.removeChild(this.parentNode)
+	};
+	vPopup.appendChild(blockClose);
+
+	var popupWindow = document.createElement('div');
+	if( type == "flash" || (type == "page" && (w != 0 || h != 0)) ) {
+		assignStyle(popupWindow, {
+			position: 'fixed',
+			width: w + 'px',
+			height: (24 + h) + 'px', // 24px caused by closebutton
+			left:'0px',
+			right:'0px',
+			top:'0px',
+			bottom:'0px',
+			margin: 'auto',
+		});
+	} else {
+		assignStyle(popupWindow, {
+			position: 'fixed',
+			top:'5%',
+			bottom:'5%',
+			left:'5%',
+			right:'5%',
+			paddingBottom: '24px' // padding needs caused by closebutton
+		});
+		if(!mobile) {
+			// additional margins needed for sb_overlays 
+			assignStyle(popupWindow, { 
+				marginRight: '100px',
+				marginLeft: '100px',
+				left:'2.5%',
+				right:'2.5%'
+			});
+		}
+	}
+
+	vPopup.appendChild(popupWindow);
+
+	var closeDiv = document.createElement('div');
+	assignStyle(closeDiv, {
+		height:'20px',
+		paddingTop:'2px',
+		paddingBottom:'2px',
+		textAlign:'center',
+		backgroundColor:'#ccc'
+	});
+
+	closeButton = document.createElement("button");
+	assignStyle(closeButton, {
+		height:'20px',
+		textAlign:'center',
+		cursor:'pointer',
+		fontWeight:'bold',
+		backgroundColor:'#ccc',
+		padding: '0px',
+		borderWidth: '0',
+		fontSize: '16',
+		tabIndex: '0'
+	});
+	closeButton.innerHTML = 'CLOSE';
+	closeButton.onclick = function() {
+		vPopup.parentNode.removeChild(vPopup);
+	};
+	closeDiv.appendChild(closeButton);
+	popupWindow.appendChild(closeDiv);
+
+	var windowContent = document.createElement('div');
+	windowContent.setAttribute('id', 'popup-window-content');
+	assignStyle(windowContent, {
+		width:'100%',
+		height:'100%',
+		margin:'auto',
+		textAlign:'center',
+		backgroundColor:'#fff',
+		'-webkit-overflow-scrolling': 'touch',
+		overflow: 'auto',
+		display: 'flex'	
+	});
+
+	popupWindow.appendChild(windowContent);
+
+	var loaderStub = createPopupPlaceholder();
+	windowContent.appendChild(loaderStub);
+
+	// loading text hiding on non-image content
+	// TODO: check every type of content for loading, then hide "Loading" span.
+	var stubTodo = function(){
+		assignStyle(loaderStub, { display: 'none' });
+	}
+
+	var cashableContent = (["figure", "graphic"].indexOf(type) != -1);
+	var errorStateFn;
+	
+	var loadContent = function() {
+		if (type == "video") {
+			stubTodo();
+
+			var _video = document.createElement("video");
+			_video.setAttribute("controls", "controls");
+			_video.className += " media_player_alignment";
+			windowContent.appendChild(_video);
+			_video.src = url;
+		} else if (type == "page") {
+			stubTodo();
+
+			var _page = document.createElement("iframe");
+			_page.className += " media_player_alignment";
+			windowContent.appendChild(_page);
+			_page.src = url;			
+		} else if ((type == "figure") || (type == "graphic")) {
+			var _iframe = document.createElement("iframe");
+			_iframe.className += " media_player_alignment";
+			assignStyle(_iframe, {display: 'none'});
+
+			var otherExtensionTry = false;
+			var onFrameLoad = function(){
+				$(_iframe).contents().find("body")
+					.css('display', 'flex')
+					.css('align-items', 'center')
+					.append(
+						$('<div>') // image wrapper
+							.css('textAlign', 'center')
+							.css('minWidth', '100%')
+							.append(
+								$('<img>')
+									.load(function(){
+										loaderStub.setLoadedState()
+										$(_iframe).css('display','')
+									})
+									.error(function(){
+										if(!otherExtensionTry){
+											var extensionIndex = url.lastIndexOf('.')+1;
+											var imgExtension = url.slice(extensionIndex);
+											url = url.substring(0, extensionIndex) 
+												+ (imgExtension === 'jpg' ? 'png' : 'jpg');
+											$(this).attr('src', url)
+											otherExtensionTry = true;
+										} else {
+											errorStateFn(); // loaderStub.setErrorState(); // "Error downloading content. <br> Content is not available or you are in offline mode."
+										}
+									})
+									.attr('src', url)
+							)
+					)
+			}
+			
+			if (isIOS) {
+				windowContent.appendChild(_iframe);
+				onFrameLoad();
+			} else {
+				$(_iframe).load(function(e){
+					onFrameLoad();
+				});
+				windowContent.appendChild(_iframe);
+			}
+
+	
+			_iframe.focus();
+		} else if (type == "flash") {
+			stubTodo();
+			var flashWrapper = document.createElement('div');
+			assignStyle(flashWrapper, {
+				width: '98%',
+				height: '98%',
+				margin: '1%'
+			});
+			windowContent.appendChild(flashWrapper);
+			_flash = getSwfDcr(url);
+			$(flashWrapper).append(_flash);
+		} else {
+			stubTodo();
+
+			var _audio = document.createElement("audio");
+			_audio.setAttribute("controls","controls");
+			_audio.className += " media_player_alignment";
+			windowContent.appendChild(_audio);
+			_audio.src = url;
+		}
+	}
+	
+	callflowCallbackable("checkOnline", [], 
+		function(_isOnline) {
+			errorStateFn = _isOnline === "false" ? loaderStub.setOfflineState : loaderStub.setErrorState;
+			if (_isOnline === "false" && !cashableContent)
+				errorStateFn();
+			else
+				loadContent();
+		}, 
+		function(){
+			loadContent();
+		}
+	);
+}
+
+function assignStyle(obj,style) { 
+	for (var i in style) 
+		obj.style[i] = style[i];
+}
+
+function setAttributes(obj,attibutes){
+	for (var a in attibutes)
+		obj.setAttribute(a, attibutes[a]);
+}
+
+function getSwfDcr(url) {
+	var codebase = "download.macromedia.com/pub/shockwave/cabs/flash/swflash.cab#version=6,0,29,0";
+	var base = url.substring(0, url.lastIndexOf("/") + 1);
+
+	var obj = "<object width='100%' height='100%' codebase=" + codebase + " id='animtest' classid='clsid:D27CDB6E-AE6D-11cf-96B8-444553540000'>";
+	obj = obj +
+		"<param name='movie' value='" + url + "' />" + 
+		"<param name='base' value='" + base + "' />" +
+		"<param name='play' value='true' />" +
+		"<param name='scale' value='exactfit' />" +
+		"<param name='quality' value='high' />";
+	var embed = "<embed id='animsrc' base='" + base + "' src='" + url + "' " + 
+		"width='100%' height='100%' quality='high' " + 
+		"pluginspage='" + /*httpurl +*/ "www.macromedia.com/go/getflashplayer' type='application/x-shockwave-flash' scale='exactfit'></embed>";
+	obj = obj + embed;
+	obj = obj + "</object>";
+
+	$(obj).addClass("media_player_alignment");
+	return obj;
+}
+
+/////////////////////////////////////////////////
+/// endregion sb_media_player.js
+/////////////////////////////////////////////////
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// region Onload 
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+var mobile = getUrlParameter("mobile") == "true";
+var lstre685fix = getUrlParameter("lstre685fix") == "true";
+
+function initialFn(urlStr){
+	console.log("initialFn");
+
+	$(function() {
+		if (getUrlParameter("ignore_onload") == "") {
+			if (getUrlParameter("ereader"))
+				ereader_onload(urlStr);
+			else
+				smartbook_onload(urlStr);
+		}
+		callflow_platform(["jsCallbacksAvailable"]);
+	});
+
+	String.prototype.format = String.prototype.f = function(){
+		var args = arguments;
+		return this.replace(/\{(\d+)\}/g, function(m,n){
+			return args[n] ? args[n] : m;
+		});
+	};
+}
+
+if (!getUrlParameter("testframe")) initialFn("");
+
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// endregion Onload
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// region Side overlays
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+//var mobile = getUrlParameter("mobile") == "true";
+var paamSkin = getUrlParameter("paamskin") == "1";
+
+function isHover(e) {
+    return (e.parentElement.querySelector(':hover') === e);
+}
+
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// How it supposed to use:
+// in flow you have to call SetupFlipOverlays(prev1, prev2, next1, next2, bUseLocalTopics) where prev1, prev2, next1, next2 are int as string meaning:
+// 0 - hide
+// 1 - show disabled
+// 2 - show enabled
+// 3 - show enabled wrap
+// bUseLocalTopics - means that it will take highlighted topics in this htmls into account while calculating next topic to move (via 'go to topic' buttons)
+// this function should also be called if you want to enable/disable specific buttons
+// when user click on enabled button script send callback to flow named "ClickOverlayButton" with one parameter (either prevPage, prevTopic, nextPage or nextTopic)
+
+function updateLocalHighlightedTopics() {
+    var los = $('[class^="loid_"]');
+    
+    var _top = $(window).scrollTop();
+    var _bottom = $(window).scrollTop() + window.innerHeight;
+    //console.log('updateLocalHighlightedTopics ' + _top + ' ' + _bottom);
+
+    var fff = los.filter(function() {
+        return $(this).data("yellowhighlighted") == "yes" && $(this).offset().top > _bottom;
+    });
+    Next2Local = (fff != null && fff.length) > 0 ? fff.eq(0) : null;
+    //console.log('updateLocalHighlightedTopics next:' + (Next2Local != null ? Next2Local.attr("class") : "NONE"));
+
+    fff = los.filter(function() {
+        return $(this).data("yellowhighlighted") == "yes" && $(this).offset().top < _top;
+    });
+    Prev2Local = (fff != null && fff.length) > 0 ? fff.eq(-1) : null;
+    //console.log('updateLocalHighlightedTopics prev:' + (Prev2Local != null ? Prev2Local.attr("class") : "NONE"));
+}
+
+var Prev1Data = "0";
+var Prev2Data = "0";
+var Next1Data = "0";
+var Next2Data = "0";
+var Prev2Local = null;
+var Next2Local = null;
+var useLocalHighlightedTopics = false;
+
+function nextHighlightedTopicPresented() {	return Next2Local != null;	}
+function prevHighlightedTopicPresented() {	return Prev2Local != null;	}
+
+function goToNextHighlight(isMobile) {
+	if (useLocalHighlightedTopics) 
+		updateLocalHighlightedTopics();
+	if (nextHighlightedTopicPresented()) {
+		if (isMobile == "true") {
+			$('html, body').scrollTop(calcOfsWithTarget(Next2Local.offset().top, 
+				window.innerHeight, Next2Local.height(), 3));
+		} else {
+			Next2Data = "2";
+			scrollLoIntoViewEx(Next2Local, 3);
+		}
+	} else {
+		callflow_platform(['ClickOverlayButton', 'next2']);
+	}
+}
+
+function goToPrevHighlight(isMobile) {
+	if (useLocalHighlightedTopics)
+		updateLocalHighlightedTopics();
+	if (prevHighlightedTopicPresented()) {
+		if (isMobile == "true") {
+			$('html, body').scrollTop(calcOfsWithTarget(Prev2Local.offset().top, 
+				window.innerHeight, Prev2Local.height(), 2));
+		} else {
+			Prev2Data = "2";
+	 		scrollLoIntoViewEx(Prev2Local, 2);
+		}
+	} else {
+		callflow_platform(['ClickOverlayButton', 'prev2']);
+	}
+}
+
+function SetupFlipOverlays(bPrev1, bPrev2, bNext1, bNext2, bUseLocalTopics) {
+	//console.log('SetupFlipOverlays(' + bPrev1 + ', ' + bPrev2 + ', ' + bNext1 + ', ' + bNext2 + ', ' + bUseLocalTopics + ')');
+    useLocalHighlightedTopics = (bUseLocalTopics == "true");
+    
+    $("body.wide").css("margin","0px 25px");
+	$(window).scroll(function() { /*console.log('ON SCROLL');*/ updateLocalHighlightedTopics(); })
+	
+    //console.log('check buttons');
+    Prev1Data = bPrev1;
+    Prev2Data = bPrev2;
+    Next1Data = bNext1;
+    Next2Data = bNext2;
+}
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// endregion Side overlays
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// region Print 
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+function printPage() {
+	window.print();
+}
+
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// endregion Print
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Scroll region EREADER
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+var lastElement = -1;
+var elements;
+var elementsOffsetTop;
+var pages;
+
+$(function() {
+	if (!getUrlParameter("ereader"))
+		return;
+
+	if (elements == undefined){
+		elements = $(".annotator-wrapper *");
+		updateElementsOffsetTop();
+	}
+
+	var scrollToID	= getUrlParameter("scrollToID");
+
+	if (scrollToID != "")
+		GoToElementID(scrollToID);
+
+	$(window).scroll(
+		function() {
+			fve = GetFirstVisibleElementID();
+			if (fve != lastElement) {
+				lastElement = fve;
+				callflow_platform(["scroll", String(fve)]);
+			}
+		}
+	);
+});
+
+function updateElementsOffsetTop(){
+	elementsOffsetTop = elements.map(function(x){
+			return elements[x].offsetTop;
+		});
+}
+
+function GetFirstVisibleElementID() {
+	var scroll = $(window).scrollTop();
+	var el;
+	var i = 0;
+	if (elements !== undefined){
+		for (i = 0; i < elementsOffsetTop.length; i++) {
+			el = $(elements[i]);
+			if (elementsOffsetTop[i] >= scroll && el.is(':visible'))
+				break;
+		}
+	}
+	return i;
+}
+
+function GoToElementID(id) {
+	if(elementsOffsetTop.length <= id){
+		return;
+	}
+	DoScroll(elementsOffsetTop[id]);
+}
+
+function DoScroll(top) {
+	$('html, body').scrollTop(top);
+}
+
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Scroll region SMARTBOOK
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+function ScrollToPage(page) {
+	console.log('ScrollToPage(' + page + ')');
+	//$("#PG_" + page).scrollIntoView();
+	var offset = $("#PG_" + page).offset();
+	$('html, body').animate({
+		scrollTop: offset.top
+	});
+}
+
+function getScrollPosition() {
+	posTop = (window.pageYOffset !== undefined) ? window.pageYOffset : (document.documentElement || document.body.parentNode || document.body).scrollTop;
+	callflow_platform(["changeScrollPosition", String(posTop)]);
+}
+
+function scrollToPosition(posTop){
+	if (!getUrlParameter("ereader")) {
+		console.log("Change Scroll to position" + String(posTop));
+		$(window).scrollTop(posTop);
+	} else {
+		GoToElementID(posTop);
+	}
+
+}
+
+function scrollLoIntoView(directionOrLoid) {
+	console.log('scrollLoIntoView(' + directionOrLoid + ')');
+
+	var entry = null;
+	if (directionOrLoid == "1" || directionOrLoid == "-1") {
+		entry = $('[class^="loid_"]').filter(function() { return $(this).data("yellowhighlighted") == "yes"; }).eq(directionOrLoid == "1" ? 0 : -1);
+	} else {
+		entry = $("[class^='loid_'][class*='" + directionOrLoid + "']").eq(0);
+	}
+
+	if (entry != null) {
+		scrollLoIntoViewEx(entry, (directionOrLoid == "1" ? 2 : (directionOrLoid == "-1" ? 3 : 4)));
+	}
+}
+
+function checkPagesPosition() {
+	if (!mobile && pages !== undefined && pages.length > 1) {
+		var visiblePage;
+		if (window.scrollY < 50)
+			visiblePage = pages[0];
+		else if (window.innerHeight + window.scrollY >= document.body.offsetHeight)
+			visiblePage = pages[pages.length - 1];
+		else
+			pages.each(function (i, el) {
+				var top = $(el).offset().top;
+				if (top <= window.pageYOffset)
+					visiblePage = el;
+				else if (top > window.pageYOffset && top <= window.pageYOffset + $(window.top).height() / 3)
+					visiblePage = el;
+			});
+
+		callflow_platform(["setPageInNavigation", String(visiblePage.id)]);
+	}
+}
+
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// End of scroll region
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// region Search
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+searchService = {};
+
+searchService.init = function(serviceUrl) {
+	console.log("searchService.init: " + serviceUrl);
+	if (typeof serviceUrl == "string" && serviceUrl.trim() != "") {
+		this.url = serviceUrl.trim();
+	} else {
+		this.url = fixScheme(sbScriptLocation + "flow/php/search.php");
+	}
+};
+
+searchService.search = function(query, docId, onDone, onFail) {
+	console.log("query: " + query + "; docId: " + docId);
+	var _query = typeof query == "string" ? query.trim() : "";
+	var _docId = typeof docId == "string" ? docId.trim() : "";
+
+	if (_query != "" && _docId != "") {
+		$.ajax({
+			url: this.url,
+			data: {
+				q: _query,
+				id: _docId
+			}
+		}).done(onDone);
+	} else {
+		if (typeof onFail == "function"){
+			onFail();
+		}
+	}
+};
+
+function searchServiceInitAndSearch(serviceUrl, query, docId) {
+	searchService.init(serviceUrl);
+
+	highlightSearchQuerySimple(query, docId, "true");
+}
+
+function traverseTextNodes(callback) {
+	var offset = 0;
+	function rec(node, skip) {
+		if (node.nodeType == Node.TEXT_NODE) {
+			var text = $(node).text();
+			if (!skip) callback(node, text, offset);
+			offset += text.length;
+		} else {
+			$(node).contents().each(function(i,n) {
+				cSkip = skip || $(node).hasClass("glossarydesc") || $(node).hasClass("footnotedesc") || $(node).hasClass("sb-reader-popup");
+				rec(n, cSkip);
+			});
+		}
+	}
+	rec($("body")[0], false);
+}
+
+function setHighlight(args) {
+	
+	var additionalAttributes = "";
+	if (!getUrlParameter("ereader"))
+		additionalAttributes = ' style="background-color: #FFC0CB"';
+
+	function setHighlightsFromList(list) {
+		var curElem = 0;
+		function getNextPos() {
+			return curElem < list.length? list[curElem][0] : 0x7fffffff;
+		}
+		function advancePos() {
+			return list[curElem++][1];
+		}
+		traverseTextNodes(function(node, text, offset) {
+			while (getNextPos() < offset)
+				advancePos();
+			var nodeEnd = offset + text.length;
+			while (true) {
+				var selPos = getNextPos();
+				if (selPos >= nodeEnd)
+					break;
+				var selLength = advancePos();
+				node = highlightSelection(node, selPos - offset, selLength);
+				offset = selPos + selLength;
+			}
+		});
+	}
+	
+	function highlightSelection(node, start, length) {
+		var selection = node.splitText(start);
+		var rest = selection.splitText(length);
+		if (args.highlight) { 
+			$(selection).wrapAll('<span class="search_keyword"' + additionalAttributes + '></span>');
+		} else {
+			$(selection.parentElement).replaceWith(selection.textContent);
+		}
+		return rest;
+	}
+	
+	function makeList(keyword) {
+		var txt = $("body").text().toLowerCase();
+		var result = [];
+		var i = 0;
+		function isLetter(idx) {
+			return idx <= 0 || idx >= txt.length || /\w/.test(txt.charAt(idx));
+		}
+		for(;;) {
+			var j = txt.indexOf(keyword, i);
+			if (j < 0) break;
+			if (!isLetter(j-1) && !isLetter(j+ keyword.length))
+				result.push([j, keyword.length]);
+			i = j + keyword.length;
+		}
+		return result;
+	}
+
+	setHighlightsFromList(makeList(args.keyword));
+}
+		
+function highlightSearchQuerySimple(query, docId, highlight) {
+	searchService.search(query, docId, function(json) {
+		var keywords = JSON.parse(json);
+		var args = keywords.map(function(kw){
+			return {keyword: kw, highlight: (highlight === "true")}
+		});
+		args.forEach(setHighlight);
+		if ((document.getElementById("next_match")) == undefined)
+			showNextMatchButton();
+	})
+}
+
+function highlightSearchQueryReplace(lastQuery, currentQuery, docId) {
+	if (lastQuery.trim() == "")
+		highlightSearchQuerySimple(currentQuery, docId, "true")
+	else searchService.search(lastQuery, docId, function(json) {
+		var keywordsLast = JSON.parse(json);
+		var argsLast = keywordsLast.map(function(kw){
+			return {keyword: kw, highlight: false}
+		});
+		argsLast.forEach(setHighlight);
+		if(currentQuery.trim() == "")
+			hideNextMatchButton()
+		else searchService.search(currentQuery, docId, function(json2) {
+			var keywords = JSON.parse(json2);
+			var args = keywords.map(function(kw){
+				return {keyword: kw, highlight: true}
+			});
+			args.forEach(setHighlight);
+			if ((document.getElementById("next_match")) == undefined)
+				showNextMatchButton();
+		});
+	});
+}
+
+function findAndWrapTextToScroll(textToFind, isNewPage) {
+	var previousSpan = $("#scrollhere");
+	if(previousSpan) {
+		var pContent = previousSpan.html();
+		var pParent = previousSpan.parent();
+		previousSpan.replaceWith(pContent);
+	};
+	query = decodeURIComponent(getUrlParameter("searchQuery"));
+	docId = getUrlParameter("searchDocId");
+	searchService.search(query, docId, function(json) {
+		var keywords = JSON.parse(json);
+		findAndWrapTextToScroll2(textToFind, keywords, isNewPage)
+	}, function(){
+		var keywords = [];
+		findAndWrapTextToScroll2(textToFind, keywords, isNewPage);
+	});
+}
+
+function findAndWrapTextToScroll2(textToFind, keywords, isNewPage)	{
+	var wordsToFind = textToFind.match(/\w+/g);
+	if (wordsToFind != null) {
+		var st = 0;
+		var isFound = false;
+		var resultNode;
+		var kwNode = null;
+		var kwIndex = 0;
+		var kwLength = 0;
+		var isFirstKeywordFound = false;
+		traverseTextNodes(function(node, text, offset) {
+			if (!isFound) {
+				var wordPos = 0;
+				var wordRE = /\w+/g;
+				var arr;
+				while ((arr = wordRE.exec(text)) !== null) {
+					var word = arr[0];
+					if (word == wordsToFind[st])
+						st++;
+					else if(word == wordsToFind[0])
+						st = 1;
+					else {
+						st = 0;
+						isFirstKeywordFound = false;
+					}
+					if (st > 0 && !isFirstKeywordFound && keywords.indexOf(word.toLowerCase()) > -1) {
+						kwNode = node;
+						kwIndex = text.indexOf(word);
+						kwLength = word.length;
+						isFirstKeywordFound = true;
+					}
+					if (st == wordsToFind.length) {
+						isFound = true;
+						if(isFirstKeywordFound) {
+							var firstKeyword = kwNode.splitText(kwIndex);
+							var rest = firstKeyword.splitText(kwLength);
+							$(firstKeyword).wrapAll('<span id="scrollhere"></span>');
+							resultNode = node;
+						} else {
+							var lastWord = node.splitText(wordRE.lastIndex - wordsToFind[st-1].length);
+							var rest = lastWord.splitText(wordsToFind[st-1].length);
+							$(lastWord).wrapAll('<span id="scrollhere"></span>');
+							resultNode = node;
+						}
+						break;
+					}
+				}
+			}
+		});
+		if(isNewPage) {
+			$(function() {
+				var loaded = 0;
+				var total = $("img").length;
+				scrollFn = function() {
+					loaded++;
+					if(loaded >= total) {
+						var elem = $("#scrollhere");
+						if(elem)
+						scrollLoIntoViewEx(elem, 2);
+					}
+				};
+				if(total == 0)
+					scrollFn();
+				else $("img").one("load", scrollFn).each(function() {
+					if(this.complete) $(this).load();
+				})
+			});
+		}
+		else if (document.readyState === "complete") {
+			var elem = $("#scrollhere");
+			if(elem)
+				scrollLoIntoViewEx(elem, 2);
+		}
+	}
+}
+
+function scrollToText(text, isNewPage)
+{
+	scrollToTextString = text;
+	findAndWrapTextToScroll(unescape(scrollToTextString), (isNewPage === "true"));
+}
+
+function showNextMatchButton() {
+	if (!lstre685fix){
+		var btn = $("<div>").attr("id", "next_match").addClass("backbutton").css("right", "100px").css("top", "10px").html("Next match");
+		var matches = $(".search_keyword");
+		var curIndex = -1;
+		if (matches.length > 1) {
+			btn.click(function() {
+				var scrolledIndex = matches.index($(".search_keyword").has("#scrollhere"));
+				if (curIndex == -1 && scrolledIndex != -1)
+					curIndex = scrolledIndex + 1 < matches.length ? scrolledIndex + 1 : 0;
+				else
+					curIndex = curIndex + 1 < matches.length ? curIndex + 1 : 0;
+
+				var match = matches[curIndex];
+				scrollLoIntoViewEx($(match), 2);
+			});
+
+			$("body").append(btn);
+		}
+	}
+}
+
+function hideNextMatchButton() {
+	$("#next_match").remove();
+}
+
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// endregion Search
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// region Smartbook
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+var isDimDisabled = false;
+
+
+function smartbook_onload(urlStr) {
+	// The following statement MUST be first in the function
+	// Please, don't insert anything before it
+    // prevent changing of the page in the Highlight Marker
+    if (parent.isStaticPage !== undefined || getUrlParameter("ignore") == "true")
+        return;
+
+    var _omitinit = getUrlParameter("omitinit");
+    if (_omitinit == null || _omitinit != "true") {
+        // I think we don't want to load 'extra' data when it's not required (say when we load thumbnails) due performance
+        // So all 'secondary' pages will be loaded with 'omitinit=true' parameter (at least it's done for thumbnail
+        // Maybe some other stuff above can be moved into this 'protected' function
+        // We should initialize all api and features only for pages in the Read mode. 
+        // All thumbnails pages should be just displayed with out any actions
+
+        if (typeof MathJaxInit === "function")
+            MathJaxInit();
+
+        modifyAllImageTags();
+
+        isEpubMode = getUrlParameter("epub") == "1" || getUrlParameter("epub") == "true";
+        highlightsEnabled = parseInt(getUrlParameter("highlights")) == 1;
+
+        try {
+            $(document).tooltip();
+        } catch(e) {
+            console.log(e);
+        }
+
+        $("body").css("visibility", "hidden");      // case 32319
+        //setPGray(true);
+
+        $("img").error(function() { $(this).hide(); });
+
+        console.log("document ready");
+        //swapCacheInit();
+
+        $(".glos").css("cursor", "pointer");
+        if(!isEpubMode)
+            LoadGlossary("../highlight/Glossary.htm","../genhtml/Glossary.htm");
+
+        $(".asset_audio_botsegi").html(function(i, text) {
+            return "<a class=\"link\" onclick='myClickAudio(\"" + this.title + "\");'>Audio</a>"
+        });
+
+        if (mobile)
+            $("body").addClass("phone");
+
+        $(window).scroll(function() { 
+            try {
+                getScrollPosition();
+                checkPagesPosition();
+            } catch(e) {
+                console.log(e);
+            }
+        });
+        $(window).on("scroll resize", throttle(function() {
+            getAllInSightLos($(window).scrollTop())
+        }, 10000));
+
+        var waitForMathJax = $("script[src$='/mathjaxinit.js']").length > 0;
+        if(!waitForMathJax) {
+            callflow_platform(['OnLoad']);
+            focusOnIFrame();
+        }
+
+        if (!mobile)
+            $(window).keydown(function(e) {
+                if (e.ctrlKey && (e.which == 109 || e.which == 107))
+                    e.preventDefault();
+            });
+
+        $(document).keyup(function(e) {
+            callflow_platform(["KeyUp", String(e.keyCode)]);
+        });
+        
+        interceptAllLinks();
+        window.onresize = function() {
+            if (backButtonExist())
+                updateBackButtonPosition();
+            lrWindowOnResize();
+            
+            /*try {
+                checkPagesPosition();
+            } catch(e) {
+                console.log(e);
+            }*/
+        };
+        lrWindowOnResize();
+
+        if (getUrlParameter("test_annotator") == "1") {
+            var userId      = getParameterFromStr("user_id", urlStr); 
+            var productId   = getParameterFromStr("product_id", urlStr);
+            var pageIndex   = getParameterFromStr("page_index", urlStr); 
+            var apiUrl      = getParameterFromStr("apiUrl", urlStr); 
+            smartbook_load_annotator(userId, productId, pageIndex, apiUrl);
+        }
+        // else {
+            // $('body').find('script').remove();
+            // $('body').wrapInner('<div class="annotator-wrapper"></div>');
+        // }
+
+        // legacy block
+        if (getUrlParameter("searchQuery") != "") {
+            var query = decodeURIComponent(getUrlParameter("searchQuery"));
+            var docId = getUrlParameter("searchDocId");
+            searchServiceInitAndSearch("", query, docId);
+        }
+
+        setupIndexElements();
+        UpdateAudio();
+    } else {
+        $("body").css("visibility", "visible");
+        return;
+    }
+}
+
+function smartbook_load_annotator(userId, productId, pageIndex, apiUrl, resetStorage, initialData) {
+	if (typeof Annotator == "undefined") return;
+	annotator.init(userId, "smartbook:" + productId, pageIndex, fixScheme(apiUrl), resetStorage, initialData);
+	annotator.setHighlightStyle('border-bottom: 2px solid #EC008C; line-height: 1.4;');
+}
+
+function setDimDisabled() {
+    isDimDisabled = true;
+}
+
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// endregion Smartbook
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+function swapCacheInit() {
+
+  var logEvent = function(e) {
+    console.log("Cache event: ", e.type, e);
+    //document.writeln("<br/>Cache event: " + e.type);
+  };
+
+  var logError = function(e) {
+    console.log("Cache error: ", e.type, e);
+    //document.writeln("<br/>Cache error: " + e.type);
+  };
+
+  // --- add this to all pages
+  // and this JS, if placed in separate file, should be in urllist's for all chapters
+  // ---- begin
+  window.applicationCache.addEventListener('updateready', function(e)
+  {
+    try {
+      logEvent(e); // remove if not necessary
+      window.applicationCache.update(); 
+      window.applicationCache.swapCache();
+      window.location.reload(); 
+    } catch (err){
+      console.log("applicationCache error: ", err);
+    }
+  }, false);
+  // ---- end
+
+  window.applicationCache.addEventListener('cached', logEvent, false);
+  window.applicationCache.addEventListener('checking', logEvent, false);
+  window.applicationCache.addEventListener('downloading', logEvent, false);
+  window.applicationCache.addEventListener('error', logError, false);
+  window.applicationCache.addEventListener('noupdate', logEvent, false);
+  window.applicationCache.addEventListener('obsolete', logEvent, false);
+  window.applicationCache.addEventListener('progress', logEvent, false);
+}
+
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// region Tooltips
+// this part is used by Smartbook only
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+var hiddenTooltips = "";
+
+function initTooltips(hidden) {
+	hiddenTooltips = hidden;
+	
+	$("[data-hasqtip]").each(function() {
+		$(this).qtip("destroy", true);
+	});
+	
+	var yellow = $("[highlight='yellow']");
+	if (hiddenTooltips.indexOf("highlightTooltipUncompleted") == -1) {
+		yellow.each(function() {
+			setYellowTooltip($(this));
+		});
+	} else {
+		/*yellow.each(function() {
+			$(this).qtip("destroy", true);
+        });*/
+	}
+	
+	var green = $("[highlight='green']");
+	if (hiddenTooltips.indexOf("highlightTooltipCompleted") == -1) {
+		green.each(function() {
+			setGreenTooltip($(this));
+		});
+	} else {
+		/*green.each(function() {
+			$(this).qtip("destroy", true);
+        });*/
+	}
+
+	var gray = $("[highlight='gray']");
+	if (hiddenTooltips.indexOf("highlightTooltipDimmed") == -1) {
+		gray.each(function() {
+			setGrayTooltip($(this));
+		});
+	} else {
+		/*gray.each(function() {
+			$(this).qtip("destroy", true);
+        });*/
+	}
+
+	$("a.glos:has([data-hasqtip]),a.footnote:has([data-hasqtip]), a.epub_glos:has([data-hasqtip]), a.epub_footnote:has([data-hasqtip])").each(function() {
+		$(this).find("[data-hasqtip]").qtip("destroy", true);
+	})
+}
+
+function setYellowTooltip(elem) {
+	var text = 'This section is highlighted because it contains topics that are especially important for you.';
+	setTooltip(elem, text);
+}
+
+function setGreenTooltip(elem) {
+	var text = 'By now, you have demonstrated that you have a deep understanding of the topics in this section!';
+	setTooltip(elem, text);
+}
+
+function setGrayTooltip(elem) {
+	var undimmed = 'Read this section if you do not understand the highlighted topic.';
+	var dimmed = 'The text is dimmed because right now it is less relevant for you to study. You can always reveal the text by clicking it.';
+	var text = elem.css("color") == "rgb(211, 211, 211)" ? dimmed :	undimmed;
+	setTooltip(elem, text);
+}
+
+function setTooltip(elem, text) {
+	elem.qtip();
+	var buttonTemplate = $('<a class="qtip-close qtip-icon" title="Don\'t show this tooltip" aria-label="Don\'t show this tooltip" role="button"><span class="ui-icon ui-icon-close" style="font-size:14px">x</span></a>');	
+	elem.qtip({
+		content: {
+			text: text,
+			button: buttonTemplate.clone()
+		},
+		position: {
+			target: 'mouse',
+			adjust: { x: 7, y: 7, mouse : false }
+		},
+		style: {
+			classes: 'qtip-light'
+		},
+		hide: {
+            fixed: true
+        },
+        show: {
+        	solo: true
+        },
+        events: {
+	        render: function(event, api) {
+	            var target = api.elements.target;
+	            var btn = api.elements.button;
+	            btn.click(function() {
+					var callback = "";
+					if (target.attr("highlight") == "yellow")
+	            		callback = "highlightTooltipUncompleted";
+	            	else if (target.attr("highlight") == "green")
+	            		callback = "highlightTooltipCompleted";
+	            	else if (target.attr("highlight") == "gray")
+	            		callback = "highlightTooltipDimmed";
+
+					callflow_platform(["closeTooltip", callback]);
+					target.qtip("hide", true);
+				});
+	        }
+	    }
+	});
+}
+
+function disableQtip(elem) {
+	elem.parents("[data-hasqtip]").qtip("hide", true).qtip("disable");
+}
+
+function enableQtip(elem) {
+	if ($(".gloss_tooltip").length != 0) {
+		elem.parents("[data-hasqtip]").qtip("enable").qtip("show", true);
+	}
+}
+
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// endregion Tooltips
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// region Unsorted
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+var isEztMode = false;
+var isEbookMode = false;
+var isEpubMode = false; 
+var isPhoneScreen = false;
+
+function changeFontSize(fontSize) {
+    console.log("changeFontSize " + fontSize);
+
+    var zoomBase = $('div.annotator-wrapper');
+    if (zoomBase.length != 1) {
+        $('body, p, td, span').css('font-size', fontSize + '%');
+        $('#textBlock').css('font-size', $('body').css('font-size'));
+    }
+    else if (isFirefox) {
+        var sf = fontSize / 100.0;
+        zoomBase.css('transform','scale(' + sf + ')');
+        zoomBase.css('transform-origin','left top');
+        zoomBase.css('width', $('body').width() / sf);
+        currentFontSize = fontSize;
+    }
+    else
+        zoomBase.css('zoom', ' ' + fontSize + '%');
+
+    if (mobile) updateCoachPosition();
+
+    overlaysTopUpdate();
+
+    if (getUrlParameter("ereader"))
+        callflow_platform(["fontChanged"]);
+}
+
+function decodeHtmlEntity(str) {
+    return str.replace(/&#(\d+);/g, function(match, dec) {
+        return String.fromCharCode(dec);
+    });
+};
+
+function throttle(callback, limit) {
+    var wait = false;
+    return function () {
+        if (!wait) {
+            wait = true;
+            setTimeout(function () {
+                callback.call();
+                wait = false;
+            }, limit);
+        }
+    }
+}
+
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// region Unsorted
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// region Viewstat
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+var viewStat = {
+	idleInterval: 600,
+	isInitialized : false
+	//url: 'http://html1.mhlearnsmart.com/smartbook2/flow/php/viewstat.php'
+}
+
+viewStat.init = function(pageData, apiUrl) {
+	if (this.isInitialized) viewStat.refreshFields(pageData, apiUrl);
+	else {
+
+		try {
+			window.parent.viewStatData;
+		} catch(e) {
+			return;
+		}
+
+
+		viewStat.refreshFields(pageData, apiUrl);
+		
+		$(window).scroll(this.onUserAction.bind(this));
+		$(window).click(this.onUserAction.bind(this));
+		$(window).on("unload", function() {
+			this.isUnloading = true;
+			this.onUserAction();
+			this.closeTimeInterval();
+		}.bind(this)); 
+		
+		this.startTime = this.endTime = this.getTime();
+		
+		if (window.parent.viewStatData) {
+			this.send(window.parent.viewStatData);
+			window.parent.viewStatData = null;
+		}
+	}
+}
+
+viewStat.refreshFields = function(pageData, apiUrl) {
+	this.data = pageData;
+	this.url = apiUrl + 'flow/php/viewstat.php';
+	this.refreshTimer();
+	this.isInitialized = true;
+}
+
+
+viewStat.getTime = function() {
+	return Math.round(new Date().getTime() / 1000.0);
+}
+
+viewStat.refreshTimer = function() {
+	if (this.timer_id) clearTimeout(this.timer_id);
+	this.timer_id = setTimeout(this.closeTimeInterval.bind(this), this.idleInterval * 1000);
+}
+
+viewStat.onUserAction = function () {
+	this.endTime = this.getTime();
+	if (!this.startTime) this.startTime = this.endTime;
+	this.refreshTimer();
+}
+
+viewStat.send = function(data) {
+	if (this.isUnloading)
+		window.parent.viewStatData = data;
+	else {
+		var params = $.param({json: JSON.stringify(data)});
+		$.get(this.url + "?" + params, function() {
+		});
+	}
+}
+
+viewStat.closeTimeInterval = function () {
+	this.timer_id = null;
+	this.data.start = this.startTime;
+	this.data.duration = this.endTime - this.startTime;
+	if (this.data.duration > 0) 
+		this.send(this.data);
+	this.startTime = this.endTime = null;
+}
+
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// region Viewstat
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

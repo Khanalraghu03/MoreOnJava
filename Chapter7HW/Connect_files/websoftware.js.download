@@ -1,0 +1,56 @@
+// common functions for web-software written in js
+
+// additionally decode "%25" to "%" because realHTML on cpp platform always encodes "%" even in encoded strings
+function wsGetUrlParameter(name){
+  var value = getUrlParameter(name);
+  if (value !== "") {
+    refined = value.replace(new RegExp("%25(?=[0-9, A-F]{2})", "g"), "%");
+    value = decodeURIComponent(refined);
+  }
+  return value;
+}
+
+// get input data as a js object {"name" : <name of content>, "content": <content>} from URL string
+function wsGetInputData(name) {
+  var data = {};
+  var value = wsGetUrlParameter(name);
+  var value_name = wsGetUrlParameter(value + "_name");
+  var content = wsGetUrlParameter(value + "_content");
+  if (content !== "") {
+    value = content;
+  }
+  data["name"] = value_name;
+  data["content"] = value;
+  return data;
+}
+
+// Create a new web-software output or add data to existing one
+function wsAddToOutput(output, name, newContent) {
+  var newOutput = {};
+  if (output !== null) {
+    newOutput = output;
+  }
+  newOutput[name] = newContent;
+  return newOutput;
+}
+
+function wsPostToMaster(output) {
+  var parsel = {};
+  parsel["webSoftwareOutput"] = output;
+  postToFlow(parsel);
+}
+
+function wsSaveAndExit(output) {
+  // Output should be a js object {contentName1:content1, contentName2:content2, ...}. 
+  // Consider using wsAddToOutput to make output
+  wsPostToMaster(JSON.stringify(output));
+}
+
+function wsExit() {
+  wsPostToMaster("");
+}
+
+// clear background
+var indicator = document.getElementById("loading_js_indicator");
+if (indicator != null) indicator.style.display = "none";
+if (document.body != null) document.body.style.backgroundImage = "none";

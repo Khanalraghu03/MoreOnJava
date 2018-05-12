@@ -1,0 +1,133 @@
+function customPostToFlow(value) {
+	console.log("container_helper: " + JSON.stringify(value));
+	postToFlow(value);
+}
+
+
+function setPanels(title, chapters, aheads) {
+	console.log("== setPanels ==");
+	message = {
+		set : [
+			{
+				name: 'chapters',
+				title: title,
+				chapters: chapters
+			}, 
+			{
+				name: 'aheads',
+				title: '',
+				chapter: '',
+				aheads: aheads
+			}
+		]
+	};
+	customPostToFlow(message);
+}
+
+
+function setTocPanel() {
+	console.log("== setTocPanel ==");
+	message = {
+		set : [
+			{
+				name: 'toc',
+				title: '',
+				items: []
+			}
+		]
+	};
+	customPostToFlow(message);
+}
+
+
+function postToPanel(panel, key, value) {
+	message = {
+		post : {
+			destination:panel,
+			message:[
+				{
+					key: key,
+					value: value
+				}
+			]
+		}
+	};
+	customPostToFlow(message);
+}
+
+
+function postToPanelMultiple(panel, keyValue) {
+	var _keyValue = JSON.parse(keyValue);
+	var kv = new Array();
+	var i = 0;
+	while (i < _keyValue.length - 1) {
+		kv.push({
+			key: _keyValue[i],
+			value: _keyValue[i + 1]
+		});
+
+		i = i + 2;
+	}
+
+	console.log(kv);
+	message = {
+		post : {
+			destination:panel,
+			message:kv
+		}
+	};
+	customPostToFlow(message);
+}
+
+
+function popActivity() {
+	message = { popActivity: {} };
+	customPostToFlow(message);
+}
+
+function leaveApp() {
+	message = { leaveApp: {} };
+	customPostToFlow(message);
+}
+
+function hideMenu() {
+	message = { setMenuState2: "hide" };
+	customPostToFlow(message);
+}
+
+
+function expandMenu() {
+	message = { setMenuState2: "expand" };
+	customPostToFlow(message);
+}
+
+
+function collapseMenu() {
+	message = { setMenuState2: "collapse" };
+	customPostToFlow(message);
+}
+
+
+function checkDomain() {
+	try {
+		var b = document.getElementsByTagName('iframe')[0].contentDocument.body;
+	} catch (e) {
+		if (e.name == "SecurityError") {
+			var curDomain = document.domain;
+			alert("Content domain \"mheducation.com\" does not match application domain \"" + curDomain + "\".");
+		}
+
+		return false;
+	}
+}
+
+
+function onLoad() {
+	console.log("onLoad");
+}
+
+function start() {
+	console.log("tocontainer.js loaded");
+}
+
+start();

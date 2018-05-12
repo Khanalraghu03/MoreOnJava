@@ -1,0 +1,2088 @@
+@charset "UTF-8";
+/*--------------------------------------------------------------------
+ * View Edition CSS
+ *------------------------------------------------------------------*/
+/* @import url("see_digital_edition.css");*/
+/* @import url("see_print_edition.css"); */
+/* @import url("see_instructor_edition.css"); */
+/*--------------------------------------------------------------------
+ * Inkling Template
+ *
+ * Please consider our style recommendations:
+ *
+ * 1. Every block of CSS should contain a comment explaining 
+ *    its purpose.
+ *
+ * 2. Avoid using !important tags. Respect the cascade.
+ *
+ * 3. Use the least specific selector for the job (avoid
+ *    overqualifying).
+ *
+ * Happy Styling!
+ * - The Inkling Team
+ *------------------------------------------------------------------*/
+/*--------------------------------------------------------------------------------------
+ * Book-specific CSS Goes elsewhere
+ *--------------------------------------------------------------------------------------
+ * Please add any book specific styles to the Custom.css file.
+ * This file can be accessed in the Customize Styles tab of habitat in the left sidebar. 
+ * Click on custom.css in the sidebar to load the stylesheet.
+ *--------------------------------------------------------------------------------------*/
+/*--------------------------------------------------------------------
+ * Layout Classes 
+ *
+ * The following classes handle width and alignment.
+ * WARNING: Editing these classes may cause unintended effects.
+ *------------------------------------------------------------------*/
+/*------------------------------------------------------------------
+ * Width
+ *----------------------------------------------------------------*/
+.width-whole,
+.one-whole {
+  width: 100%;
+  clear: both;
+}
+
+.one-half {
+  width: 48%;
+}
+.grid .one-half {
+  width: 50%;
+}
+
+.one-third {
+  width: 31%;
+}
+.grid .one-third {
+  width: 33.3%;
+}
+
+.two-thirds {
+  width: 65%;
+}
+.grid .two-thirds {
+  width: 66.66%;
+}
+
+.one-fourth {
+  width: 48%;
+}
+.grid .one-fourth {
+  width: 50%;
+}
+@media (min-width: 560px) {
+  .one-fourth {
+    width: 22.5%;
+  }
+  .grid .one-fourth {
+    width: 25%;
+  }
+}
+
+.two-fourths {
+  width: 48%;
+}
+.grid .two-fourths {
+  width: 50%;
+}
+
+.three-fourths {
+  width: 73.5%;
+}
+.grid .three-fourths {
+  width: 75%;
+}
+
+.one-sixth {
+  width: 16.65%;
+}
+.grid .one-sixth {
+  width: 17.5%;
+}
+
+.one-eighth {
+  width: 12.5%;
+}
+.grid .one-eighth {
+  width: 13%;
+}
+
+@media only screen and (max-width: 559px) {
+  .fractional-width, .one-half, .one-third, .two-thirds, .two-fourths, .three-fourths, .one-sixth, .one-eighth {
+    width: 100%;
+    margin-left: 0;
+    margin-right: 0;
+  }
+  .grid .fractional-width, .grid .one-half, .grid .one-third, .grid .two-thirds, .grid .two-fourths, .grid .three-fourths, .grid .one-sixth, .grid .one-eighth {
+    width: 100%;
+  }
+}
+
+/*------------------------------------------------------------------
+ * Alignment
+ *----------------------------------------------------------------*/
+.left {
+  float: left;
+  clear: left !important;
+  display: block;
+  margin-left: 0;
+  margin-right: 5.1%;
+}
+.one-half.right + .left {
+  margin-right: 0;
+}
+
+.right {
+  float: right;
+  clear: right !important;
+  display: block;
+  margin-left: 0;
+  margin-left: 5.1%;
+}
+.one-half.left + .right {
+  margin-left: 0;
+}
+
+.center {
+  float: none;
+  display: block;
+  margin-left: auto !important;
+  margin-right: auto !important;
+}
+
+/*------------------------------------------------------------------
+ * Left and Right double-up
+ *----------------------------------------------------------------*/
+.left + .right {
+  margin-left: 0;
+}
+
+.right + .left {
+  margin-right: 0;
+}
+
+/*------------------------------------------------------------------
+ * Grid Row (using CSS tables)
+ *----------------------------------------------------------------*/
+.grid {
+  margin-bottom: 0.375em;
+}
+.grid div > h1, .grid div > h2, .grid div > h3, .grid div > h4, .grid div > h5, .grid div > h6 {
+  margin-bottom: 0em;
+}
+.grid div > h1 + *, .grid div > h2 + *, .grid div > h3 + *, .grid div > h4 + *, .grid div > h5 + *, .grid div > h6 + * {
+  margin-top: 1.14em;
+}
+
+.row {
+  display: table;
+  width: 100%;
+  table-layout: fixed;
+}
+.row > * {
+  display: block;
+  vertical-align: top;
+}
+.row > *:last-child {
+  margin-bottom: 0em;
+}
+@media (min-width: 560px) {
+  .row > * {
+    display: table-cell;
+    margin-bottom: 0;
+  }
+}
+
+.grid.grid-padded {
+  margin-top: -14.25px;
+  margin-left: -14.25px;
+  margin-right: -14.25px;
+}
+@media (min-width: 560px) {
+  .grid.grid-padded {
+    margin-top: -19px;
+    margin-left: -19px;
+    margin-right: -19px;
+  }
+}
+.grid.grid-padded .row {
+  border-collapse: separate;
+  border-spacing: 14.25px;
+}
+@media (min-width: 560px) {
+  .grid.grid-padded .row {
+    border-spacing: 19px;
+  }
+}
+
+.grid-align-middle .row > * {
+  vertical-align: middle;
+}
+
+.grid-align-bottom .row > * {
+  vertical-align: bottom;
+}
+
+/*--------------------------------------------------------------------
+ * Media Blocks
+ * 
+ * These are generic layout classes for placing content to the left 
+ * or right of a figue or other element.
+ *
+ *  <div class="media-right">
+ *      <div class="content">
+ *          <!-- Put your flow/text content here -->
+ *      </div>
+ *      <div class="media">
+ *          <!-- Put your figure/image content here -->
+ *      </div>
+ *  </div>
+ *------------------------------------------------------------------*/
+.media-right {
+  clear: both;
+}
+.media-right:after {
+  content: "";
+  display: table;
+  clear: both;
+}
+.media-right .content {
+  width: 65%;
+  float: left;
+  clear: left !important;
+  display: block;
+  margin-left: 0;
+  margin-right: 5.1%;
+  margin-bottom: 1.5em;
+}
+.grid .media-right .content {
+  width: 66.66%;
+}
+.one-half.right + .media-right .content {
+  margin-right: 0;
+}
+@media only screen and (max-width: 559px) {
+  .media-right .content {
+    width: 100%;
+    margin-left: 0;
+    margin-right: 0;
+  }
+  .grid .media-right .content {
+    width: 100%;
+  }
+}
+.media-right .media {
+  width: 31%;
+  float: right;
+  clear: right !important;
+  display: block;
+  margin-left: 0;
+  margin-left: 5.1%;
+  margin-left: 0;
+}
+.grid .media-right .media {
+  width: 33.3%;
+}
+.one-half.left + .media-right .media {
+  margin-left: 0;
+}
+@media only screen and (max-width: 559px) {
+  .media-right .media {
+    width: 100%;
+    margin-left: 0;
+    margin-right: 0;
+  }
+  .grid .media-right .media {
+    width: 100%;
+  }
+}
+
+.media-left {
+  clear: both;
+}
+.media-left:after {
+  content: "";
+  display: table;
+  clear: both;
+}
+.media-left .content {
+  width: 65%;
+  float: right;
+  clear: right !important;
+  display: block;
+  margin-left: 0;
+  margin-left: 5.1%;
+  margin-left: 0;
+}
+.grid .media-left .content {
+  width: 66.66%;
+}
+.one-half.left + .media-left .content {
+  margin-left: 0;
+}
+@media only screen and (max-width: 559px) {
+  .media-left .content {
+    width: 100%;
+    margin-left: 0;
+    margin-right: 0;
+  }
+  .grid .media-left .content {
+    width: 100%;
+  }
+}
+.media-left .media {
+  width: 31%;
+  float: left;
+  clear: left !important;
+  display: block;
+  margin-left: 0;
+  margin-right: 5.1%;
+}
+.grid .media-left .media {
+  width: 33.3%;
+}
+.one-half.right + .media-left .media {
+  margin-right: 0;
+}
+@media only screen and (max-width: 559px) {
+  .media-left .media {
+    width: 100%;
+    margin-left: 0;
+    margin-right: 0;
+  }
+  .grid .media-left .media {
+    width: 100%;
+  }
+}
+
+figure.web-view-scroll, table.web-view-scroll {
+  min-width: 850px !important;
+}
+figure.tablet-portrait-scroll, table.tablet-portrait-scroll {
+  min-width: 720px  !important;
+}
+figure.web-min-scroll, table.web-min-scroll {
+  min-width: 650px  !important;
+}
+figure.mobile-landscape-scroll, table.mobile-landscape-scroll {
+  min-width: 490px  !important;
+}
+figure.mobile-portrait-scroll, table.mobile-portrait-scroll {
+  min-width: 310px  !important;
+}
+figure.tablet-landscape-scroll, table.tablet-landscape-scroll {
+  min-width: 990px  !important;
+}
+
+/*--------------------------------------------------------------------
+ * Reset
+ * WARNING: Editing these styles may cause unintended effects.
+ *------------------------------------------------------------------*/
+/* Zero-out all elements to remove any browser defaults. Note
+ * that a universal selector "*" has not been used as it will
+ * generate a CSS warning on ePub 3.0 (and now we know exactly
+ * what gets targeted).
+ */
+a, abbr, acronym, address, applet, article, aside, audio,
+b, big, blockquote, body, canvas, caption, center, cite,
+code, dd, del, details, dfn, dl, dt, em, embed, fieldset,
+figcaption, figure, footer, form, h1, h2, h3, h4, h5, h6,
+header, hgroup, html, i, iframe, img, ins, input, kbd, label,
+legend, li, mark, menu, nav, object, ol, output, p, pre,
+q, ruby, s, samp, section, small, span, strike, strong, sub,
+summary, sup, table, tbody, td, textarea, tfoot, th, thead, time,
+tr, tt, u, ul, var, video, :before, :after {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  font-size: 100%;
+  font: inherit;
+  vertical-align: baseline;
+  /* Use the border-box sizing model */
+  box-sizing: border-box;
+}
+
+/*------------------------------------------------------------------
+ * Platform-specific Styles
+ *----------------------------------------------------------------*/
+/* Inline Links */
+.link-inline {
+  color: #0066CC;
+  text-decoration: none;
+  margin-right: 0.2em;
+  padding: 0.1em 1.2em 0.1em 0;
+  background: url("images/platform/icon-link-blue.svg") right center no-repeat;
+  background-size: 1em auto;
+}
+.link-inline[href*="[chapter"], .link-inline[href*="[Chapter"], .link-inline[rel="chapter"], .link-inline[rel="jump"] {
+  padding-right: 1em;
+  background: url("images/platform/icon-link-jump-blue.svg") right center no-repeat;
+  background-size: 1em auto;
+}
+
+/* Definitions */
+dfn {
+  font-weight: 700;
+  font-style: normal;
+  margin-right: 0.2em;
+  padding-right: 1.1em;
+  background: url("images/platform/icon-definition-blue.svg") right center no-repeat;
+  background-size: 1em auto;
+}
+dfn > em {
+  font-weight: 400;
+  font-style: normal;
+}
+
+/* Remarks */
+sup[href*="[remark"], sup[rel="remark"] {
+  font: 100% "stix", Georgia, serif;
+  color: #0066CC;
+  text-decoration: none !important;
+}
+sup.remark-large {
+  font-size: inherit;
+  vertical-align: inherit;
+}
+
+a[href*="[remark"], a[rel="remark"] {
+  font: 100% "stix", Georgia, serif;
+  color: #0066CC;
+  text-decoration: none !important;
+}
+a.remark-large {
+  font-size: inherit;
+  vertical-align: inherit;
+}
+
+/*--------------------------------------------------------------------
+ * s9 Scrollable
+ * Provides a way to scroll content that is too wide for the content 
+ * window. When the page loads reader.js determines if the content 
+ * needs to scroll. If so, it will add `.s9-is-scrollable` class to 
+ * the surrounding div.
+ * Note: This requires `<div class="s9-scrollable">` to surround the 
+ * content you want to scroll.
+ *------------------------------------------------------------------*/
+.s9-scrollable {
+  clear: both;
+  display: block;
+  overflow: auto;
+  margin-bottom:20px;
+  /* Figures inside s9-scrollable should be full-size */
+  /* Reader.js will activate this class if content needs to scroll */
+}
+.s9-scrollable img {
+  width: auto;
+}
+.s9-scrollable > table {
+  text-align: left;
+  min-width: 100%;
+}
+.s9-scrollable.align-left {
+  text-align: left !important;
+}
+.s9-scrollable.align-right {
+  text-align: right !important;
+}
+.s9-scrollable.s9-is-scrollable {
+  box-shadow: inset 1px 0px 5px #CCC;
+  margin-top: 1.5em;
+  margin-bottom: 1.5em;
+  /* Add padding to push content away from scrolling inset shadow */
+  padding-top: 1.5em;
+  padding-bottom: 1.5em;
+  /* Required to restore right padding. Don't apply if scrollable contains multiple direct children. */
+}
+.s9-scrollable.s9-is-scrollable :last-child {
+  margin-bottom: 0em;
+}
+.s9-scrollable.s9-is-scrollable > *:only-child {
+  display: inline-block;
+}
+.s9-scrollable.s9-is-scrollable > table {
+  margin-right: 100px;
+}
+@media (max-width: 750px) {
+  .s9-scrollable.s9-is-scrollable > table {
+    margin-right: 160px;
+  }
+}
+@media (min-width: 820px) {
+  .s9-scrollable.s9-is-scrollable > table {
+    margin-right: 160px;
+  }
+}
+@media (max-width: 500px) {
+  .s9-scrollable.s9-is-scrollable > table {
+    margin-right: 40px;
+  }
+}
+
+/* Fixes a scrolling bug in iOS */
+.s9-scrollable table {
+  -webkit-transform: none !important;
+}
+
+/* Bleed the scrolling area to edge of page (except for nested scrolling areas) */
+body > .s9-scrollable {
+  margin-left: -20px;
+  margin-right: -20px;
+  padding-left: 20px;
+  padding-right: 20px;
+}
+@media (min-width: 560px) {
+  body > .s9-scrollable {
+    margin-left: -70px;
+    margin-right: -70px;
+  }
+}
+@media (min-width: 820px) {
+  body > .s9-scrollable {
+    margin-left: -100px;
+    margin-right: -100px;
+  }
+}
+@media (min-width: 560px) {
+  body > .s9-scrollable {
+    padding-left: 70px;
+    padding-right: 70px;
+  }
+}
+@media (min-width: 820px) {
+  body > .s9-scrollable {
+    padding-left: 100px;
+    padding-right: 100px;
+  }
+}
+
+/*--------------------------------------------------------------------
+ * s9 Audio Button
+ * Styling for inline audio player button. Change this only if 
+ * absolutely necessary.
+ *------------------------------------------------------------------*/
+.s9-audio-button-custom {
+  margin-top: 23px;
+  display: inline-block;
+  padding: 6px 10px 6px 40px;
+  color: #fff;
+  text-decoration: none;
+  text-indent: 0;
+  text-align: left;
+  text-transform: none;
+  font-family: "stix", Georgia, serif;
+  font-size: .8em;
+  font-weight: 600;
+  line-height: 1.1em;
+  -webkit-user-select: none;
+  -khtml-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+  -o-user-select: none;
+  user-select: none;
+  border-radius: 5px;
+  background: #999999 url(images/white/icon-audio.svg) no-repeat 10px center;
+  background-size: 20% auto;
+}
+.s9-audio-button-custom.s9-active {
+  opacity: .5;
+}
+
+/*------------------------------------------------------------------
+* Habitat Helpers
+*----------------------------------------------------------------*/
+figure > a,
+figure > img,
+figure .figure-image {
+  /* Required for tap highlight */
+  display: block;
+}
+
+/*--------------------------------------------------------------------
+ * Key Terms
+ * Uses floated list items to create the holders for the data.
+ *
+ * `.no-link` is used for page numbers that do not have links in Key Terms Cloud Extended.
+ *
+ * See [Key Term](/pattern-library/core-patterns/lists/key-term/) for example HMTL.
+ *------------------------------------------------------------------*/
+.key-term {
+  padding-left: 0;
+  overflow: hidden;
+}
+.key-term li {
+  float: left;
+  display: table;
+  list-style: none;
+  margin: 0 0.6em 0.6em 0;
+  border: 1px solid #A9ABAE;
+  border-right: none;
+  background: #fff;
+  position: relative;
+}
+.key-term li > dfn, .key-term li > .term-only, .key-term li > .nolink {
+  font-family: "stix", Georgia, serif;
+  font-size: 1em;
+  font-weight: 600;
+  line-height: 1.4em;
+  font-style: normal;
+  color: #000;
+  background: none;
+  display: table-cell;
+  padding: 0.5em;
+  border-right: 1px solid #A9ABAE;
+  height: 1.5em;
+}
+.key-term li > dfn:after, .key-term li > .term-only:after, .key-term li > .nolink:after {
+  width: 1em;
+  height: 1em;
+  display: inline-block;
+  padding-left: .2em;
+  content: "";
+  background: url("images/platform/icon-definition-blue.svg") 100% 0.2em no-repeat;
+  background-size: .9em auto;
+  top: 2px;
+  position: relative;
+}
+.key-term li > .term-only:after, .key-term li > .nolink:after {
+  content: none;
+}
+.key-term a {
+  font-family: "stix", Georgia, serif;
+  font-weight: 600;
+  color: black;
+  padding: 0.1em 1.1em 0.1em .5em;
+  margin-right: .5em;
+  background: url("images/platform/icon-link-blue.svg") 100% 0.2em no-repeat;
+  background-size: .9em auto;
+}
+.key-term a:after {
+  content: "";
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  border-right: 1px solid #A9ABAE;
+}
+
+/*--------------------------------------------------------------------
+ * Key Term Extended
+ *------------------------------------------------------------------*/
+.key-term-extended {
+  font-family: "stix", Georgia, serif;
+  font-size: 19px;
+  font-weight: 400;
+  line-height: 1.4em;
+  list-style: none;
+  padding: 0;
+}
+.key-term-extended li {
+  margin: .5em 0;
+}
+
+/*------------------------------------------------------------------
+ * S9 Video
+ *----------------------------------------------------------------*/
+.s9-video {
+  position: relative;
+  padding-bottom: 56.25%;
+  padding-top: 25px;
+  height: 0;
+}
+.s9-video iframe {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.full-bleed,
+.bleed {
+  margin-left: -20px;
+  margin-right: -20px;
+}
+@media (min-width: 560px) {
+  .full-bleed,
+  .bleed {
+    margin-left: -70px;
+    margin-right: -70px;
+  }
+}
+@media (min-width: 820px) {
+  .full-bleed,
+  .bleed {
+    margin-left: -100px;
+    margin-right: -100px;
+  }
+}
+
+.bleed-padding {
+  margin-left: -20px;
+  margin-right: -20px;
+  padding-left: 20px;
+  padding-right: 20px;
+}
+@media (min-width: 560px) {
+  .bleed-padding {
+    margin-left: -70px;
+    margin-right: -70px;
+  }
+}
+@media (min-width: 820px) {
+  .bleed-padding {
+    margin-left: -100px;
+    margin-right: -100px;
+  }
+}
+@media (min-width: 560px) {
+  .bleed-padding {
+    padding-left: 70px;
+    padding-right: 70px;
+  }
+}
+@media (min-width: 820px) {
+  .bleed-padding {
+    padding-left: 100px;
+    padding-right: 100px;
+  }
+}
+
+.restore-padding {
+  padding-left: 20px;
+  padding-right: 20px;
+}
+@media (min-width: 560px) {
+  .restore-padding {
+    padding-left: 70px;
+    padding-right: 70px;
+  }
+}
+@media (min-width: 820px) {
+  .restore-padding {
+    padding-left: 100px;
+    padding-right: 100px;
+  }
+}
+
+.push {
+  margin-left: 0;
+  margin-right: 0;
+}
+@media (min-width: 560px) {
+  .push {
+    margin-left: 1.5em;
+    margin-right: 1.5em;
+  }
+}
+@media (min-width: 820px) {
+  .push {
+    margin-left: 3em;
+    margin-right: 3em;
+  }
+}
+
+.pull {
+  margin-left: -20px;
+  margin-right: -20px;
+}
+@media (min-width: 560px) {
+  .pull {
+    margin-left: -70px;
+  }
+}
+@media (min-width: 820px) {
+  .pull {
+    margin-left: -100px;
+  }
+}
+@media (min-width: 560px) {
+  .pull {
+    margin-right: -70px;
+  }
+}
+@media (min-width: 820px) {
+  .pull {
+    margin-right: -100px;
+  }
+}
+@media (min-width: 560px) {
+  .pull {
+    margin-left: -1.5em;
+    margin-right: -1.5em;
+  }
+}
+@media (min-width: 820px) {
+  .pull {
+    margin-left: -3em;
+    margin-right: -3em;
+  }
+}
+
+.pull-padding {
+  margin-left: -20px;
+  margin-right: -20px;
+  padding-left: 20px;
+  padding-right: 20px;
+}
+@media (min-width: 560px) {
+  .pull-padding {
+    margin-left: -70px;
+  }
+}
+@media (min-width: 820px) {
+  .pull-padding {
+    margin-left: -100px;
+  }
+}
+@media (min-width: 560px) {
+  .pull-padding {
+    margin-right: -70px;
+  }
+}
+@media (min-width: 820px) {
+  .pull-padding {
+    margin-right: -100px;
+  }
+}
+@media (min-width: 560px) {
+  .pull-padding {
+    margin-left: -1.5em;
+    margin-right: -1.5em;
+  }
+}
+@media (min-width: 820px) {
+  .pull-padding {
+    margin-left: -3em;
+    margin-right: -3em;
+  }
+}
+@media (min-width: 560px) {
+  .pull-padding {
+    padding-left: 70px;
+  }
+}
+@media (min-width: 820px) {
+  .pull-padding {
+    padding-left: 100px;
+  }
+}
+@media (min-width: 560px) {
+  .pull-padding {
+    padding-right: 70px;
+  }
+}
+@media (min-width: 820px) {
+  .pull-padding {
+    padding-right: 100px;
+  }
+}
+@media (min-width: 560px) {
+  .pull-padding {
+    padding-left: 1.5em;
+    padding-right: 1.5em;
+  }
+}
+@media (min-width: 820px) {
+  .pull-padding {
+    padding-left: 3em;
+    padding-right: 3em;
+  }
+}
+
+.bleed-false {
+  margin-left: -20px;
+  margin-right: -20px;
+}
+@media (min-width: 560px) {
+  .bleed-false {
+    margin-left: -70px;
+    margin-right: -70px;
+  }
+}
+@media (min-width: 820px) {
+  .bleed-false {
+    margin-left: -100px;
+    margin-right: -100px;
+  }
+}
+
+.bleed-padding-false {
+  margin-left: -20px;
+  margin-right: -20px;
+  padding-left: 20px;
+  padding-right: 20px;
+}
+@media (min-width: 560px) {
+  .bleed-padding-false {
+    margin-left: -70px;
+    margin-right: -70px;
+  }
+}
+@media (min-width: 820px) {
+  .bleed-padding-false {
+    margin-left: -100px;
+    margin-right: -100px;
+  }
+}
+@media (min-width: 560px) {
+  .bleed-padding-false {
+    padding-left: 70px;
+    padding-right: 70px;
+  }
+}
+@media (min-width: 820px) {
+  .bleed-padding-false {
+    padding-left: 100px;
+    padding-right: 100px;
+  }
+}
+
+.restore-padding-false {
+  padding-left: 20px;
+  padding-right: 20px;
+}
+@media (min-width: 560px) {
+  .restore-padding-false {
+    padding-left: 70px;
+    padding-right: 70px;
+  }
+}
+@media (min-width: 820px) {
+  .restore-padding-false {
+    padding-left: 100px;
+    padding-right: 100px;
+  }
+}
+
+.push-false {
+  margin-left: 0;
+  margin-right: 0;
+}
+@media (min-width: 560px) {
+  .push-false {
+    margin-left: 1.5em;
+    margin-right: 1.5em;
+  }
+}
+@media (min-width: 820px) {
+  .push-false {
+    margin-left: 3em;
+    margin-right: 3em;
+  }
+}
+
+.pull-false {
+  margin-left: -20px;
+  margin-right: -20px;
+}
+@media (min-width: 560px) {
+  .pull-false {
+    margin-left: -70px;
+  }
+}
+@media (min-width: 820px) {
+  .pull-false {
+    margin-left: -100px;
+  }
+}
+@media (min-width: 560px) {
+  .pull-false {
+    margin-right: -70px;
+  }
+}
+@media (min-width: 820px) {
+  .pull-false {
+    margin-right: -100px;
+  }
+}
+@media (min-width: 560px) {
+  .pull-false {
+    margin-left: -1.5em;
+    margin-right: -1.5em;
+  }
+}
+@media (min-width: 820px) {
+  .pull-false {
+    margin-left: -3em;
+    margin-right: -3em;
+  }
+}
+
+.bleed-left {
+  margin-left: -20px;
+}
+@media (min-width: 560px) {
+  .bleed-left {
+    margin-left: -70px;
+  }
+}
+@media (min-width: 820px) {
+  .bleed-left {
+    margin-left: -100px;
+  }
+}
+
+.bleed-padding-left {
+  margin-left: -20px;
+  padding-left: 20px;
+}
+@media (min-width: 560px) {
+  .bleed-padding-left {
+    margin-left: -70px;
+  }
+}
+@media (min-width: 820px) {
+  .bleed-padding-left {
+    margin-left: -100px;
+  }
+}
+@media (min-width: 560px) {
+  .bleed-padding-left {
+    padding-left: 70px;
+  }
+}
+@media (min-width: 820px) {
+  .bleed-padding-left {
+    padding-left: 100px;
+  }
+}
+
+.restore-padding-left {
+  padding-left: 20px;
+}
+@media (min-width: 560px) {
+  .restore-padding-left {
+    padding-left: 70px;
+  }
+}
+@media (min-width: 820px) {
+  .restore-padding-left {
+    padding-left: 100px;
+  }
+}
+
+.push-left {
+  margin-left: 0;
+}
+@media (min-width: 560px) {
+  .push-left {
+    margin-left: 1.5em;
+  }
+}
+@media (min-width: 820px) {
+  .push-left {
+    margin-left: 3em;
+  }
+}
+
+.pull-left {
+  margin-left: -20px;
+}
+@media (min-width: 560px) {
+  .pull-left {
+    margin-left: -70px;
+  }
+}
+@media (min-width: 820px) {
+  .pull-left {
+    margin-left: -100px;
+  }
+}
+@media (min-width: 560px) {
+  .pull-left {
+    margin-left: -1.5em;
+  }
+}
+@media (min-width: 820px) {
+  .pull-left {
+    margin-left: -3em;
+  }
+}
+
+.bleed-right {
+  margin-right: -20px;
+}
+@media (min-width: 560px) {
+  .bleed-right {
+    margin-right: -70px;
+  }
+}
+@media (min-width: 820px) {
+  .bleed-right {
+    margin-right: -100px;
+  }
+}
+
+.bleed-padding-right {
+  margin-right: -20px;
+  padding-right: 20px;
+}
+@media (min-width: 560px) {
+  .bleed-padding-right {
+    margin-right: -70px;
+  }
+}
+@media (min-width: 820px) {
+  .bleed-padding-right {
+    margin-right: -100px;
+  }
+}
+@media (min-width: 560px) {
+  .bleed-padding-right {
+    padding-right: 70px;
+  }
+}
+@media (min-width: 820px) {
+  .bleed-padding-right {
+    padding-right: 100px;
+  }
+}
+
+.restore-padding-right {
+  padding-right: 20px;
+}
+@media (min-width: 560px) {
+  .restore-padding-right {
+    padding-right: 70px;
+  }
+}
+@media (min-width: 820px) {
+  .restore-padding-right {
+    padding-right: 100px;
+  }
+}
+
+.push-right {
+  margin-right: 0;
+}
+@media (min-width: 560px) {
+  .push-right {
+    margin-right: 1.5em;
+  }
+}
+@media (min-width: 820px) {
+  .push-right {
+    margin-right: 3em;
+  }
+}
+
+.pull-right {
+  margin-right: -20px;
+}
+@media (min-width: 560px) {
+  .pull-right {
+    margin-right: -70px;
+  }
+}
+@media (min-width: 820px) {
+  .pull-right {
+    margin-right: -100px;
+  }
+}
+@media (min-width: 560px) {
+  .pull-right {
+    margin-right: -1.5em;
+  }
+}
+@media (min-width: 820px) {
+  .pull-right {
+    margin-right: -3em;
+  }
+}
+
+.bleed-top {
+  margin-top: -20px;
+}
+@media (min-width: 560px) {
+  .bleed-top {
+    margin-top: -57px;
+  }
+}
+
+.bleed-bottom {
+  margin-bottom: -20px !important;
+  padding-bottom: 20px !important;
+}
+@media (min-width: 560px) {
+  .bleed-bottom {
+    margin-bottom: -57px !important;
+  }
+}
+@media (min-width: 560px) {
+  .bleed-bottom {
+    padding-bottom: 57px !important;
+  }
+}
+@media (min-width: 820px) {
+  .bleed-bottom {
+    padding-bottom: 57px !important;
+  }
+}
+
+.v_align-middle {
+  vertical-align: middle;
+}
+
+p.indent-text {
+  text-indent: 20px;
+}
+
+.proximanova {
+  font-family: "proximanova" !important;
+}
+
+.proximanovalight {
+  font-family: "proximanovalight";
+}
+
+.proximanovacond {
+  font-family: "proximanovacond";
+}
+
+.stix {
+  font-family: "stixregular";
+}
+
+/*------------------------------------------------------------------
+ * Base page styles
+ *
+ * WARNING: Editing these styles may cause unintended effects.
+ *----------------------------------------------------------------*/
+/* Set the base font sizes for small and larger screens */
+html {
+  font-size: 17px;
+}
+@media (min-width: 560px) {
+  html {
+    font-size: 19px;
+  }
+}
+
+/* Set the base properties */
+body {
+  clear: both;
+  display: block;
+  font-family: "stix", Georgia, serif;
+  font-weight: 400;
+  color: #333333;
+  background: #ffffff;
+  counter-reset: u-num;
+  line-height: 1.5;
+  /* Content margins react to different screen sizes */
+  margin-top: 20px;
+  padding-bottom: 20px;
+  margin-left: 20px;
+  margin-right: 20px;
+}
+body:after {
+  content: "";
+  display: table;
+  clear: both;
+}
+@media (min-width: 560px) {
+  body {
+    margin-top: 57px;
+    padding-bottom: 57px;
+    margin-left: 70px;
+    margin-right: 70px;
+  }
+}
+@media (min-width: 820px) {
+  body {
+    margin-left: 100px;
+    margin-right: 100px;
+  }
+}
+body.shaded {
+  background-color: #bbbbbb;
+}
+
+/*--------------------------------------------------------------------
+ * Form Elements
+ *------------------------------------------------------------------*/
+button,
+fieldset,
+input,
+optgroup,
+select,
+textarea {
+  /* Correct inproperly inherited font sizes/styles */
+  font: inherit;
+  /* Remove focus outline */
+}
+button:focus,
+fieldset:focus,
+input:focus,
+optgroup:focus,
+select:focus,
+textarea:focus {
+  outline: 0;
+}
+
+/*--------------------------------------------------------------------
+ * Buttons
+ *------------------------------------------------------------------*/
+button,
+html input[type="button"],
+input[type="reset"],
+input[type="submit"] {
+  /* Address `overflow` set to `hidden` in IE 9/10/11. */
+  overflow: visible;
+  /* Correct inability to style clickable `input` types in iOS. */
+  -webkit-appearance: button;
+  /*  Improve usability and consistency of cursor style between image-type `input` and others. */
+  cursor: pointer;
+  background: #3e2207;
+  color: #ffffff;
+  font-weight: 400;
+  -webkit-font-smoothing: antialiased;
+  border: 0px none;
+  padding: 0.375em 0.75em;
+}
+button:hover,
+html input[type="button"]:hover,
+input[type="reset"]:hover,
+input[type="submit"]:hover {
+  background: #c76d17;
+}
+
+/* Re-set default cursor for disabled elements. */
+button[disabled],
+html input[disabled] {
+  cursor: default;
+}
+
+/*--------------------------------------------------------------------
+ * Labels (used as containers for input elements)
+ *
+ * <lable>[input field]</label>
+ *------------------------------------------------------------------*/
+/*--------------------------------------------------------------------
+ * Text field
+ *------------------------------------------------------------------*/
+input[type="text"] {
+  line-height: normal;
+  border: 1px solid #333333;
+  border-radius: 2px;
+  padding: 0.375em;
+  min-width: 50%;
+}
+input[type="text"]:focus {
+  border: 1px solid #c76d17;
+}
+
+input[type="text"].short {
+  max-width: 125px !important;
+  min-width: 75px;
+}
+
+/*--------------------------------------------------------------------
+ * Text area
+ *------------------------------------------------------------------*/
+textarea {
+  overflow: auto;
+  /* Remove scrollbars in IE */
+  width: 100%;
+  border: 1px solid #333333;
+  border-radius: 2px;
+  padding: 0.375em;
+  outline: none;
+  resize: none;
+}
+textarea:focus {
+  border: 1px solid #c76d17;
+}
+
+/*------------------------------------------------------------------
+ * Fill-in-the-blank
+ *----------------------------------------------------------------*/
+.blank-s,
+.blank-m,
+.blank-l {
+  border-bottom: 1px solid #333333;
+  color: #c76d17;
+  font-weight: 400;
+  margin-right: 0.1579em;
+  margin-left: 0.1579em;
+  width: 2em;
+  display: inline-block;
+}
+
+.blank-m {
+  width: 5em;
+}
+
+.blank-l {
+  width: 10em;
+}
+
+/*------------------------------------------------------------------
+ * Long-answer
+ *----------------------------------------------------------------*/
+.long-answer {
+  border: 1px dashed #c76d17;
+}
+
+a {
+  color: #0066CC;
+  font-weight: 700;
+  text-decoration: underline;
+  word-break: break-all;
+}
+
+.button-a {
+  margin-bottom: 0.75em;
+  width: 100%;
+  display: block;
+  background: #eca058;
+  text-decoration: none;
+  padding: 28.5px;
+  border-radius: 3px;
+  border-bottom: 3px solid #c76d17;
+  background-position: right 19px top 50%;
+  background-size: auto 1.5em;
+  background-repeat: no-repeat;
+  background-image: url(images/black/icon-arrow.svg);
+  padding-right: 64.125px;
+}
+
+.button-b {
+  margin-bottom: 0.75em;
+  display: block;
+  border-radius: 4px;
+  text-decoration: none;
+  padding: 14.25px 28.5px;
+  text-transform: uppercase;
+  font-size: 15px;
+  font-weight: 400;
+  text-align: center;
+  background: #3e2207;
+  color: #ffffff;
+  border: 1px solid #3e2207;
+  display: block;
+}
+
+hr {
+  margin-bottom: 1.5em;
+  border: 0;
+  border-bottom: 1px solid #333333;
+}
+
+.divider-1 {
+  border-bottom: 3px solid #bbbbbb;
+}
+
+.divider-2 {
+  width: 6em;
+  max-width: 100%;
+  height: 0.5em;
+  border-top: 2px solid #bbbbbb;
+  border-bottom: 2px solid #bbbbbb;
+}
+
+.spacer-small,
+.spacer-large {
+  border: 0 none;
+}
+
+.spacer-small {
+  height: 1.5em;
+}
+
+.spacer-large {
+  height: 6em;
+}
+
+.icon-inline {
+  display: inline-block;
+  height: 1em;
+  width: auto;
+  vertical-align: sub;
+}
+
+/*------------------------------------------------------------------
+ * Footers
+ *----------------------------------------------------------------*/
+.footer-a {
+  clear: both;
+  margin-left: -20px;
+  margin-right: -20px;
+  padding-left: 20px;
+  padding-right: 20px;
+  margin-bottom: -20px !important;
+  padding-bottom: 20px !important;
+  padding-top: 28.5px;
+  background: #3e2207;
+  color: #ffffff;
+}
+.footer-a:after {
+  content: "";
+  display: table;
+  clear: both;
+}
+.footer-a :last-child {
+  margin-bottom: 0em;
+}
+@media (min-width: 560px) {
+  .footer-a {
+    margin-left: -70px;
+    margin-right: -70px;
+  }
+}
+@media (min-width: 820px) {
+  .footer-a {
+    margin-left: -100px;
+    margin-right: -100px;
+  }
+}
+@media (min-width: 560px) {
+  .footer-a {
+    padding-left: 70px;
+    padding-right: 70px;
+  }
+}
+@media (min-width: 820px) {
+  .footer-a {
+    padding-left: 100px;
+    padding-right: 100px;
+  }
+}
+@media (min-width: 560px) {
+  .footer-a {
+    margin-bottom: -57px !important;
+  }
+}
+@media (min-width: 560px) {
+  .footer-a {
+    padding-bottom: 57px !important;
+  }
+}
+@media (min-width: 820px) {
+  .footer-a {
+    padding-bottom: 57px !important;
+  }
+}
+
+.footer-b {
+  clear: both;
+  margin-left: -20px;
+  margin-right: -20px;
+  padding-left: 20px;
+  padding-right: 20px;
+  margin-bottom: -20px !important;
+  padding-bottom: 20px !important;
+  padding-top: 28.5px;
+  background: #eca058;
+}
+.footer-b:after {
+  content: "";
+  display: table;
+  clear: both;
+}
+.footer-b :last-child {
+  margin-bottom: 0em;
+}
+@media (min-width: 560px) {
+  .footer-b {
+    margin-left: -70px;
+    margin-right: -70px;
+  }
+}
+@media (min-width: 820px) {
+  .footer-b {
+    margin-left: -100px;
+    margin-right: -100px;
+  }
+}
+@media (min-width: 560px) {
+  .footer-b {
+    padding-left: 70px;
+    padding-right: 70px;
+  }
+}
+@media (min-width: 820px) {
+  .footer-b {
+    padding-left: 100px;
+    padding-right: 100px;
+  }
+}
+@media (min-width: 560px) {
+  .footer-b {
+    margin-bottom: -57px !important;
+  }
+}
+@media (min-width: 560px) {
+  .footer-b {
+    padding-bottom: 57px !important;
+  }
+}
+@media (min-width: 820px) {
+  .footer-b {
+    padding-bottom: 57px !important;
+  }
+}
+
+/*--------------------------------------------------------------------
+ * Fractions
+ * Use with with the HTML slash entity, e.g., 1&frasl;10
+ * Lorem ipsum dolor <sup class="fraction">5</sup>Γüä&frasl;sub>8</sub> 
+ * voluptate velit esse.
+ *------------------------------------------------------------------*/
+.fraction {
+  position: relative;
+  top: .25em;
+  left: -.2em;
+  margin-left: .25em;
+}
+.fraction + sub {
+  position: relative;
+  top: -0.2em;
+  margin-left: .1em;
+  margin-right: .2em;
+}
+
+var {
+  font-style: italic;
+  font-family: "stix", Georgia, serif;
+}
+
+/*--------------------------------------------------------------------
+ * Equations
+ *------------------------------------------------------------------*/
+figure > img.equation,
+.equation-key > img.equation {
+  margin-left: auto;
+  margin-right: auto;
+  height: auto;
+  width: initial;
+}
+
+figure figcaption + .equation {
+  margin-top: 25px;
+}
+
+p > img.equation,
+li > img.equation,
+figcaption img.equation {
+  height: auto;
+  display: inline-block;
+  vertical-align: -0.1em;
+}
+
+div.equation {
+  text-align: center;
+  margin: 1em auto;
+  display: inline-block;
+  padding: 0 10px;
+  white-space: nowrap;
+}
+
+span.equation {
+  white-space: nowrap;
+}
+@media only screen and (max-width: 559px) {
+  span.equation {
+    white-space: normal;
+  }
+}
+
+.number {
+  color: #c76d17;
+}
+
+/*--------------------------------------------------------------------
+ * Inline Audio and Video
+ *------------------------------------------------------------------*/
+audio {
+  width: 100%;
+}
+
+iframe {
+  width: 100%;
+}
+
+video {
+  width: 100% !important;
+  height: auto !important;
+}
+
+.video_wrapper {
+  position: relative;
+  padding-top: 56.25%;
+}
+
+.video_wrapper iframe {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+}
+
+/*--------------------------------------------------------------------
+ * Font Fallbacks
+ * The following @font-face declarations provide fallback fonts for 
+ * legacy versions of the Inkling iOS app (pre-v3.3).
+ * WARNING: Editing these declarations may cause unintended effects.
+ *------------------------------------------------------------------*/
+@font-face {
+  font-family: 'stix';
+  src: url("fonts/stix/stix-mathjax-main/stixmathjax_main-regular.woff") format("woff"), url("fonts/stix/stix-mathjax-main/stixmathjax_main-regular.svg") format("svg");
+  font-weight: 400;
+  font-style: normal;
+}
+@font-face {
+  font-family: 'stix';
+  src: url("fonts/stix/stix-mathjax-main/stixmathjax_main-italic.woff") format("woff"), url("fonts/stix/stix-mathjax-main/stixmathjax_main-italic.svg") format("svg");
+  font-weight: 400;
+  font-style: italic;
+}
+@font-face {
+  font-family: 'stix';
+  src: url("fonts/stix/stix-mathjax-main/stixmathjax_main-bold.woff") format("woff"), url("fonts/stix/stix-mathjax-main/stixmathjax_main-bold.svg") format("svg");
+  font-weight: 700;
+  font-style: normal;
+}
+@font-face {
+  font-family: 'stix';
+  src: url("fonts/stix/stix-mathjax-main/stixmathjax_main-bolditalic.svg") format("svg"), url("fonts/stix/stix-mathjax-main/stixmathjax_main-bolditalic.ttf") format("truetype");
+  font-weight: 700;
+  font-style: italic;
+}
+@font-face {
+  font-family: 'stixmonospace';
+  src: url("fonts/stix/stix-mathjax-monospace/stixmathjax_monospace-regular.svg") format("svg"), url("fonts/stix/stix-mathjax-monospace/stixmathjax_monospace-regular.ttf") format("truetype");
+  /* Safari, Android, iOS */
+  font-style: normal;
+  font-weight: normal;
+  text-rendering: optimizeLegibility;
+}
+@font-face {
+  font-family: 'stixmonospace';
+  src: url("fonts/stix/stix-mathjax-monospace/stixmathjax_monospace-regular.eot");
+  /* IE9 Compat Modes */
+  src: url("fonts/stix/stix-mathjax-monospace/stixmathjax_monospace-regular.eot?#iefix") format("embedded-opentype"), url("fonts/stix/stix-mathjax-monospace/stixmathjax_monospace-regular.woff") format("woff"), url("fonts/stix/stix-mathjax-monospace/stixmathjax_monospace-regular.ttf") format("truetype"), url("fonts/stix/stix-mathjax-monospace/stixmathjax_monospace-regular.svg#STIXMathJax_Monospace-Regular") format("svg");
+  /* Legacy iOS */
+  font-style: normal;
+  font-weight: normal;
+  text-rendering: optimizeLegibility;
+}
+@font-face {
+  font-family: 'proximanova';
+  src: url("fonts/proxima-nova/proxima-nova/proximanova.woff") format("woff"), url("fonts/proxima-nova/proxima-nova/proximanova.svg") format("svg");
+  font-weight: 400;
+  font-style: normal;
+}
+@font-face {
+  font-family: 'proximanova';
+  src: url("fonts/proxima-nova/proxima-nova/proximanova-italic.woff") format("woff"), url("fonts/proxima-nova/proxima-nova/proximanova-italic.svg") format("svg");
+  font-weight: 400;
+  font-style: italic;
+}
+@font-face {
+  font-family: 'proximanova';
+  src: url("fonts/proxima-nova/proxima-nova/proximanova-bold.woff") format("woff"), url("fonts/proxima-nova/proxima-nova/proximanova-bold.svg") format("svg");
+  font-weight: 700;
+  font-style: normal;
+}
+@font-face {
+  font-family: 'proximanova';
+  src: url("fonts/proxima-nova/proxima-nova/proximanova-boldit.woff") format("woff"), url("fonts/proxima-nova/proxima-nova/proximanova-boldit.svg") format("svg");
+  font-weight: 700;
+  font-style: italic;
+}
+@font-face {
+  font-family: 'proximanovacond';
+  src: url("fonts/proxima-nova/proxima-nova-cond/proximanovacond.woff") format("woff"), url("fonts/proxima-nova/proxima-nova-cond/proximanovacond.svg") format("svg");
+  font-weight: normal;
+  font-style: normal;
+}
+@font-face {
+  font-family: 'proximanovalight';
+  src: url("fonts/proxima-nova/proxima-nova-light/proximanova-light.woff") format("woff"), url("fonts/proxima-nova/proxima-nova-light/proximanova-light.svg") format("svg");
+  font-weight: 200;
+  font-style: normal;
+}
+@font-face {
+  font-family: 'proximanovalight';
+  src: url("fonts/proxima-nova/proxima-nova-light/proximanova-lightit.woff") format("woff"), url("fonts/proxima-nova/proxima-nova-light/proximanova-lightit.svg") format("svg");
+  font-weight: 200;
+  font-style: italic;
+}
+@font-face {
+  font-family: 'arum sans light';
+  src: url("fonts/arumsans/arumsans/arumsanslight.woff") format("woff"), url("fonts/arumsans/arumsans/arumsanslight.svg") format("svg");
+  font-weight: normal;
+  font-style: normal;
+}
+@font-face {
+  font-family: 'arum sans';
+  src: url("fonts/arumsans/arumsans-rg/arumsansregular.woff") format("woff"), url("fonts/arumsans/arumsans-rg/arumsansregular.svg") format("svg");
+  font-weight: normal;
+  font-style: normal;
+}
+@font-face {
+  font-family: 'arum sans';
+  src: url("fonts/arumsans/arumsans-rg/arumsansitalic.woff") format("woff"), url("fonts/arumsans/arumsans-rg/arumsansitalic.svg") format("svg");
+  font-weight: normal;
+  font-style: italic;
+}
+@font-face {
+  font-family: 'arum sans';
+  src: url("fonts/arumsans/arumsans-rg/arumsansextrabold.woff") format("woff"), url("fonts/arumsans/arumsans-rg/arumsansextrabold.svg") format("svg");
+  font-weight: 700;
+  font-style: normal;
+}
+@font-face {
+  font-family: 'arum sans';
+  src: url("fonts/arumsans/arumsans-rg/arumsansextrabolditalic.woff") format("woff"), url("fonts/arumsans/arumsans-rg/arumsansextrabolditalic.svg") format("svg");
+  font-weight: 700;
+  font-style: italic;
+}
+@font-face {
+  font-family: 'sra serif';
+  src: url("fonts/sra-serif-1.1/sra-serif-unicode_1.1/sraserifunicode1.woff") format("woff"), url("fonts/sra-serif-1.1/sra-serif-unicode_1.1/sraserifunicode1.svg") format("svg");
+  font-weight: normal;
+  font-style: normal;
+}
+@font-face {
+  font-family: 'sra serif';
+  src: url("fonts/sra-serif-1.1/sra-serif-unicode_1.1/sraserif11-bold2.woff") format("woff"), url("fonts/sra-serif-1.1/sra-serif-unicode_1.1/sraserif11-bold2.svg") format("svg");
+  font-weight: 700;
+  font-style: normal;
+}
+@font-face {
+  font-family: 'sra serif';
+  src: url("fonts/sra-serif-1.1/sra-serif-unicode_1.1/sraserif11-bolditalic2.woff") format("woff"), url("fonts/sra-serif-1.1/sra-serif-unicode_1.1/sraserif11-bolditalic2.svg") format("svg");
+  font-weight: 700;
+  font-style: italic;
+}
+@font-face {
+  font-family: 'sra serif';
+  src: url("fonts/sra-serif-1.1/sra-serif-unicode_1.1/sraserif11-italic2.woff") format("woff"), url("fonts/sra-serif-1.1/sra-serif-unicode_1.1/sraserif11-italic2.svg") format("svg");
+  font-weight: normal;
+  font-style: italic;
+}
+@font-face {
+  font-family: 'sraserifcondensed';
+  src: url("fonts/sra-serif-1.1/sra-serif_1.1/sraserif1.woff") format("woff"), url("fonts/sra-serif-1.1/sra-serif_1.1/sraserif1.svg") format("svg");
+  font-weight: normal;
+  font-style: normal;
+}
+@font-face {
+  font-family: 'that';
+  src: url("fonts/that/that-rg/that-book.woff") format("woff"), url("fonts/that/that-rg/that-book.svg") format("svg");
+  font-weight: normal;
+  font-style: normal;
+}
+@font-face {
+  font-family: 'that';
+  src: url("fonts/that/that-rg/that-italic.woff") format("woff"), url("fonts/that/that-rg/that-italic.svg") format("svg");
+  font-weight: normal;
+  font-style: italic;
+}
+@font-face {
+  font-family: 'that light';
+  src: url("fonts/that/that-lt/that-light.woff") format("woff"), url("fonts/that/that-lt/that-light.svg") format("svg");
+  font-weight: normal;
+  font-style: normal;
+}
+@font-face {
+  font-family: 'that light';
+  src: url("fonts/that/that-lt/that-lightitalic.woff") format("woff"), url("fonts/that/that-lt/that-lightitalic.svg") format("svg");
+  font-weight: normal;
+  font-style: italic;
+}
+@font-face {
+  font-family: 'that';
+  src: url("fonts/that/that-bd/that-bold.woff") format("woff"), url("fonts/that/that-bd/that-bold.svg") format("svg");
+  font-weight: 700;
+  font-style: normal;
+}
+@font-face {
+  font-family: 'that';
+  src: url("fonts/that/that-bd/that-bolditalic.woff") format("woff"), url("fonts/that/that-bd/that-bolditalic.svg") format("svg");
+  font-weight: 700;
+  font-style: italic;
+}
+@font-face {
+  font-family: 'urpalladio';
+  src: url("fonts/urw-palladio-tot/urwpalladiotot/urwpalladiotot-reg.woff") format("woff"), url("fonts/urw-palladio-tot/urwpalladiotot/urwpalladiotot-reg.svg") format("svg");
+  font-weight: normal;
+  font-style: normal;
+}
+@font-face {
+  font-family: 'urpalladio';
+  src: url("fonts/urw-palladio-tot/urwpalladiotot/urwpalladiotot-regita.woff") format("woff"), url("fonts/urw-palladio-tot/urwpalladiotot/urwpalladiotot-regita.svg") format("svg");
+  font-weight: normal;
+  font-style: italic;
+}
+@font-face {
+  font-family: 'urpalladio';
+  src: url("fonts/urw-palladio-tot/urwpalladiotot/urwpalladiotot-bol.woff") format("woff"), url("fonts/urw-palladio-tot/urwpalladiotot/urwpalladiotot-bol.svg") format("svg");
+  font-weight: 700;
+  font-style: normal;
+}
+@font-face {
+  font-family: 'urpalladio';
+  src: url("fonts/urw-palladio-tot/urwpalladiotot/urwpalladiotot-bolita.woff") format("woff"), url("fonts/urw-palladio-tot/urwpalladiotot/urwpalladiotot-bolita.svg") format("svg");
+  font-weight: 700;
+  font-style: italic;
+}
+@font-face {
+  font-family: 'vectipede';
+  src: url("fonts/vectipede/vectipede-rg/vectipederg-regular.woff") format("woff"), url("fonts/vectipede/vectipede-rg/vectipederg-regular.svg") format("svg");
+  font-weight: normal;
+  font-style: normal;
+}
+@font-face {
+  font-family: 'vectipede';
+  src: url("fonts/vectipede/vectipede-rg/vectipederg-italic.woff") format("woff"), url("fonts/vectipede/vectipede-rg/vectipederg-italic.svg") format("svg");
+  font-weight: normal;
+  font-style: italic;
+}
+@font-face {
+  font-family: 'vectipede';
+  src: url("fonts/vectipede/vectipede-rg/vectipederg-bold.woff") format("woff"), url("fonts/vectipede/vectipede-rg/vectipederg-bold.svg") format("svg");
+  font-weight: 700;
+  font-style: normal;
+}
+@font-face {
+  font-family: 'vectipede';
+  src: url("fonts/vectipede/vectipede-rg/vectipederg-bolditalic.woff") format("woff"), url("fonts/vectipede/vectipede-rg/vectipederg-bolditalic.svg") format("svg");
+  font-weight: 700;
+  font-style: italic;
+}
+/* Webfont: Spud */
+@font-face {
+  font-family: 'Spud';
+  src: url("fonts/spud/spud.eot");
+  /* IE9 Compat Modes */
+  src: url("fonts/spud/spud.eot?#iefix") format("embedded-opentype"), url("fonts/spud/spud.woff") format("woff"), url("fonts/spud/spud.ttf") format("truetype"), url("fonts/spud/spud.svg") format("svg");
+  /* Legacy iOS */
+  font-style: normal;
+  font-weight: normal;
+  text-rendering: optimizeLegibility;
+}
+/* Webfont: Spud-Italic */
+@font-face {
+  font-family: 'Spud';
+  src: url("fonts/spud/spud-italic.eot");
+  /* IE9 Compat Modes */
+  src: url("fonts/spud/spud-italic.eot?#iefix") format("embedded-opentype"), url("fonts/spud/spud-italic.woff") format("woff"), url("fonts/spud/spud-italic.ttf") format("truetype"), url("fonts/spud/spud-italic.svg") format("svg");
+  /* Legacy iOS */
+  font-style: italic;
+  font-weight: normal;
+  text-rendering: optimizeLegibility;
+}
+/* Webfont: SpudBold */
+@font-face {
+  font-family: 'Spud';
+  src: url("fonts/spud/spudbold.eot");
+  /* IE9 Compat Modes */
+  src: url("fonts/spud/spudbold.eot?#iefix") format("embedded-opentype"), url("fonts/spud/spudbold.woff") format("woff"), url("fonts/spud/spudbold.ttf") format("truetype"), url("fonts/spud/spudbold.svg") format("svg");
+  /* Legacy iOS */
+  font-style: normal;
+  font-weight: 700;
+  text-rendering: optimizeLegibility;
+}
+/* Webfont: SpudBold-Italic */
+@font-face {
+  font-family: 'Spud';
+  src: url("fonts/spud/spudbold-italic.eot");
+  /* IE9 Compat Modes */
+  src: url("fonts/spud/spudbold-italic.eot?#iefix") format("embedded-opentype"), url("fonts/spud/spudbold-italic.woff") format("woff"), url("fonts/spud/spudbold-italic.ttf") format("truetype"), url("fonts/spud/spudbold-italic.svg") format("svg");
+  /* Legacy iOS */
+  font-style: italic;
+  font-weight: 700;
+  text-rendering: optimizeLegibility;
+}
+@font-face {
+  font-family: "Source Sans Pro";
+  src: local("Whitney-Book");
+  font-weight: 300;
+}
+@font-face {
+  font-family: "Source Sans Pro";
+  src: local("Whitney-BookItalic");
+  font-weight: 300;
+  font-style: italic;
+}
+@font-face {
+  font-family: "Source Sans Pro";
+  src: local("Whitney-Book");
+  font-weight: 400;
+}
+@font-face {
+  font-family: "Source Sans Pro";
+  src: local("Whitney-BookItalic");
+  font-weight: 400;
+  font-style: italic;
+}
+@font-face {
+  font-family: "Source Sans Pro";
+  src: local("Whitney-Semibold"), local("WhitneySemibold-Regular");
+  font-weight: 600;
+}
+@font-face {
+  font-family: "Source Sans Pro";
+  src: local("Whitney-SemiboldItalic"), local("WhitneySemibold-Italic");
+  font-weight: 600;
+  font-style: italic;
+}
+@font-face {
+  font-family: "Source Sans Pro";
+  src: local("Whitney-Bold");
+  font-weight: 700;
+}
+@font-face {
+  font-family: "Source Sans Pro";
+  src: local("Whitney-BoldItalic");
+  font-weight: 700;
+  font-style: italic;
+}
+@font-face {
+  font-family: "Meta Serif Office Pro";
+  src: local("Chronicle Text G4 Roman"), local("ChronicleTextG4-Roman");
+  font-weight: 400;
+}
+@font-face {
+  font-family: "Meta Serif Office Pro";
+  src: local("Chronicle Text G4 Italic"), local("ChronicleTextG4-Italic");
+  font-weight: 400;
+  font-style: italic;
+}
+@font-face {
+  font-family: "Meta Serif Office Pro";
+  src: local("Chronicle Text G4 Bold"), local("ChronicleTextG4-Bold");
+  font-weight: 700;
+}
+@font-face {
+  font-family: "Meta Serif Office Pro";
+  src: local("Chronicle Text G4 Bold Italic"), local("ChronicleTextG4-BoldItalic");
+  font-weight: 700;
+  font-style: italic;
+}
+@font-face {
+  font-family: "Tisa Mobile Pro";
+  src: local("Chronicle Text G4 Roman"), local("ChronicleTextG4-Roman");
+  font-weight: 400;
+}
+@font-face {
+  font-family: "Tisa Mobile Pro";
+  src: local("Chronicle Text G4 Italic"), local("ChronicleTextG4-Italic");
+  font-weight: 400;
+  font-style: italic;
+}
+@font-face {
+  font-family: "Tisa Mobile Pro";
+  src: local("Chronicle Text G4 Bold"), local("ChronicleTextG4-Bold");
+  font-weight: 700;
+}
+@font-face {
+  font-family: "Tisa Mobile Pro";
+  src: local("Chronicle Text G4 Bold Italic"), local("ChronicleTextG4-BoldItalic");
+  font-weight: 700;
+  font-style: italic;
+}
